@@ -22,7 +22,6 @@ export async function extractTextFromFiling(file: File): Promise<string> {
     });
     return fullText;
   }
-  // Default to PDF
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
   let fullText = '';
@@ -41,12 +40,11 @@ function redactFilingText(text: string): string {
   return redacted;
 }
 export async function analyzeInsuranceFiling(text: string, fileName: string): Promise<InsuranceFilingRecord> {
-  const upText = text.toUpperCase();
-  // Detect Carrier with improved robustness
   let carrier = 'Unknown Carrier';
   for (const [key, keywords] of Object.entries(PLAN_KEYWORDS)) {
     const found = keywords.find(k => {
-      const regex = new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      const escapedKeyword = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
       return regex.test(text);
     });
     if (found) {

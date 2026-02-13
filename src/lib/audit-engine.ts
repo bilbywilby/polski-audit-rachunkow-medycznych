@@ -1,10 +1,10 @@
 import * as pdfjs from 'pdfjs-dist';
-import { 
-  CODE_PATTERNS, 
-  REDACTION_PATTERNS, 
-  PA_RULES, 
-  FAIR_BENCHMARKS, 
-  PLAN_KEYWORDS, 
+import {
+  CODE_PATTERNS,
+  REDACTION_PATTERNS,
+  PA_RULES,
+  FAIR_BENCHMARKS,
+  PLAN_KEYWORDS,
   PA_VIOLATION_TAXONOMY,
   MAX_PAGE_COUNT,
   RuleContext
@@ -21,7 +21,7 @@ export async function generateDocumentFingerprint(text: string): Promise<string>
 export async function extractTextFromPdf(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
   const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-  const timeoutPromise = new Promise<never>((_, reject) => 
+  const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error('PDF Extraction Timeout (30s)')), 30000)
   );
   const extractionPromise = (async () => {

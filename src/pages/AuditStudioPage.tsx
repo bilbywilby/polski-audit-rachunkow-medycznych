@@ -1,14 +1,14 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { 
-  FileUp, 
-  FileText, 
-  Loader2, 
-  CheckCircle2, 
-  AlertTriangle, 
-  ArrowRight, 
-  Activity, 
-  ClipboardList, 
+import {
+  FileUp,
+  FileText,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowRight,
+  Activity,
+  ClipboardList,
   Info,
   ShieldCheck,
   Fingerprint
@@ -32,7 +32,7 @@ export function AuditStudioPage() {
   const [progress, setProgress] = useState(0);
   const [manualText, setManualText] = useState('');
   const [result, setResult] = useState<AuditRecord | null>(null);
-  const processText = async (text: string, name: string) => {
+  const processText = useCallback(async (text: string, name: string) => {
     setStep('analyzing');
     setProgress(10);
     try {
@@ -56,12 +56,12 @@ export function AuditStudioPage() {
       setStep('results');
     } catch (error) {
       console.error(error);
-      toast.error('Audit failed', { 
-        description: error instanceof Error ? error.message : 'Could not analyze the provided text.' 
+      toast.error('Audit failed', {
+        description: error instanceof Error ? error.message : 'Could not analyze the provided text.'
       });
       setStep('upload');
     }
-  };
+  }, [navigate]);
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (!file) return;
@@ -76,12 +76,12 @@ export function AuditStudioPage() {
       await processText(text, file.name);
     } catch (error) {
       console.error(error);
-      toast.error('Upload failed', { 
-        description: error instanceof Error ? error.message : 'We could not parse this PDF. Please try pasting the text manually.' 
+      toast.error('Upload failed', {
+        description: error instanceof Error ? error.message : 'We could not parse this PDF. Please try pasting the text manually.'
       });
       setStep('upload');
     }
-  }, []);
+  }, [processText]);
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'application/pdf': ['.pdf'] },
@@ -109,7 +109,7 @@ export function AuditStudioPage() {
                 <div className="space-y-1">
                   <h3 className="font-bold text-lg">Statutory Precision Audit Active</h3>
                   <p className="text-sm opacity-90 leading-relaxed">
-                    This audit cross-references your bill against <strong>PA Act 102</strong> and the <strong>No Surprises Act</strong>. 
+                    This audit cross-references your bill against <strong>PA Act 102</strong> and the <strong>No Surprises Act</strong>.
                     Local processing ensures your sensitive healthcare data never leaves this device.
                   </p>
                 </div>
