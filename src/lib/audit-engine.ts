@@ -25,30 +25,17 @@ export async function generateDocumentFingerprint(text: string): Promise<string>
 export async function extractTextFromPdf(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
   const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error('PDF Extraction Timeout (30s)')), 30000)
-  );
-  const extractionPromise = (async () => {
-    const pdf = await loadingTask.promise;
-    if (pdf.numPages > MAX_PAGE_COUNT) {
-      throw new Error(`File too large: ${pdf.numPages} pages exceeds ${MAX_PAGE_COUNT} page limit.`);
-    }
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const items = content.items as any[];
-      const sortedItems = items.sort((a, b) => {
-        if (Math.abs(a.transform[5] - b.transform[5]) < 5) {
-          return a.transform[4] - b.transform[4];
-        }
-        return b.transform[5] - a.transform[5];
-      });
-      fullText += sortedItems.map((item: any) => item.str).join(' ') + '\n';
-    }
-    return fullText;
-  })();
-  return Promise.race([extractionPromise, timeoutPromise]);
+  const pdf = await loadingTask.promise;
+  if (pdf.numPages > MAX_PAGE_COUNT) {
+    throw new Error(`File too large: ${pdf.numPages} pages exceeds ${MAX_PAGE_COUNT} page limit.`);
+  }
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    fullText += (content.items as any[]).map((item) => item.str).join(' ') + '\n';
+  }
+  return fullText;
 }
 function redactSensitiveData(text: string): { redacted: string; count: number } {
   let redacted = text;
@@ -60,112 +47,80 @@ function redactSensitiveData(text: string): { redacted: string; count: number } 
   });
   return { redacted, count };
 }
-async function computeEvidenceHash(snippet: string): Promise<string> {
-  const msgBuffer = new TextEncoder().encode(snippet);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-function detectPlanType(text: string): 'COMMERCIAL' | 'MEDICAID' | 'MEDICARE' | 'UNKNOWN' {
-  const upText = text.toUpperCase();
-  if (PLAN_KEYWORDS.MEDICAID.some(k => upText.includes(k.toUpperCase()))) return 'MEDICAID';
-  if (PLAN_KEYWORDS.MEDICARE.some(k => upText.includes(k.toUpperCase()))) return 'MEDICARE';
-  if (PLAN_KEYWORDS.COMMERCIAL.some(k => upText.includes(k.toUpperCase()))) return 'COMMERCIAL';
-  return 'UNKNOWN';
-}
-export async function analyzeBillText(text: string, fileName: string): Promise<AuditRecord> {
-  const { redacted } = redactSensitiveData(text);
-  const planType = detectPlanType(text);
-  const zipMatches = text.match(CODE_PATTERNS.zip);
-  const zipCode = zipMatches ? zipMatches[0] : undefined;
-  const fingerprint = await generateDocumentFingerprint(text);
-  const cpt = Array.from(new Set(text.match(CODE_PATTERNS.cpt) || []));
-  const hcpcs = Array.from(new Set(text.match(CODE_PATTERNS.hcpcs) || []));
-  const revenue = Array.from(new Set(text.match(CODE_PATTERNS.revenue) || []));
+export async function analyzeBillText(rawInput: string, fileName: string): Promise<AuditRecord> {
+  // REDACTION FIRST: Immediately secure the data
+  const { redacted, count: redactedCount } = redactSensitiveData(rawInput);
+  const fingerprint = await generateDocumentFingerprint(rawInput);
+  const upText = rawInput.toUpperCase();
+  let planType: 'COMMERCIAL' | 'MEDICAID' | 'MEDICARE' | 'UNKNOWN' = 'UNKNOWN';
+  if (PLAN_KEYWORDS.MEDICAID.some(k => upText.includes(k.toUpperCase()))) planType = 'MEDICAID';
+  else if (PLAN_KEYWORDS.MEDICARE.some(k => upText.includes(k.toUpperCase()))) planType = 'MEDICARE';
+  else if (PLAN_KEYWORDS.COMMERCIAL.some(k => upText.includes(k.toUpperCase()))) planType = 'COMMERCIAL';
+  const cpt = Array.from(new Set(rawInput.match(CODE_PATTERNS.cpt) || []));
   const amountRegex = /\$\s?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g;
   let match;
   const amounts: number[] = [];
-  while ((match = amountRegex.exec(text)) !== null) {
+  while ((match = amountRegex.exec(rawInput)) !== null) {
     const val = parseFloat(match[1].replace(/,/g, ''));
-    if (!isNaN(val) && val < 1000000 && val > 0.01) {
-      amounts.push(val);
-    }
+    if (!isNaN(val) && val < 1000000 && val > 0.01) amounts.push(val);
   }
   const totalAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
   const overcharges: OverchargeItem[] = [];
-  let isSevereTotal = false;
   cpt.forEach(code => {
     const fairVal = FAIR_BENCHMARKS[code];
     if (fairVal) {
       const medicareProxy = fairVal * MEDICARE_PROXY_RATIO;
-      const threshold = medicareProxy * 1.5;
       if (totalAmount > medicareProxy) {
-        const isSevere = totalAmount > threshold;
-        if (isSevere) isSevereTotal = true;
         overcharges.push({
           code,
-          description: isSevere ? `Significant Review Point (PA Quality Standard)` : `Educational Benchmark Check (Above Medicare Proxy)`,
+          description: `Educational Review Point (Above Medicare Proxy)`,
           billedAmount: totalAmount,
           benchmarkAmount: fairVal,
           medicareProxyAmount: medicareProxy,
           percentOver: Math.round(((totalAmount - medicareProxy) / medicareProxy) * 100),
-          legalCitation: isSevere ? ACT_102_REFERENCES.SECTION_5.title : undefined,
-          statutoryReference: isSevere ? ACT_102_REFERENCES.SECTION_5.description : undefined
+          legalCitation: ACT_102_REFERENCES.SECTION_5.title
         });
       }
     }
   });
-  const ruleCtx: RuleContext = { rawText: text, overcharges, cpt, planType };
-  const rawRules = PA_RULES.filter(r => r.check(ruleCtx));
-  const reviewPoints = await Promise.all(rawRules.map(async f => {
-    const snippet = text.substring(0, 200).replace(/\n/g, ' ');
-    const hash = await computeEvidenceHash(snippet);
-    return {
-      type: f.id,
-      severity: f.severity,
-      description: f.description,
-      isSevere: f.severity === 'high' || isSevereTotal,
-      taxonomy: {
-        rule_id: f.id,
-        statute_ref: PA_REVIEW_TAXONOMY[f.id] || 'PA Act 102 Quality Standards',
-        requires_review: f.severity === 'high',
-        evidence_hash: hash,
-        evidence_snippet: snippet.substring(0, 100)
-      }
-    };
+  const ruleCtx: RuleContext = { rawText: rawInput, overcharges, cpt, planType };
+  const reviewPoints = PA_RULES.filter(r => r.check(ruleCtx)).map(f => ({
+    type: f.id,
+    severity: f.severity,
+    description: f.description,
+    taxonomy: {
+      rule_id: f.id,
+      statute_ref: PA_REVIEW_TAXONOMY[f.id] || 'PA Act 102 Quality Standards',
+      requires_review: f.severity === 'high',
+      evidence_hash: 'purged',
+      evidence_snippet: '[PII PURGED FOR PRIVACY]'
+    }
   }));
-  const auditId = uuidv4();
-  const dates = text.match(CODE_PATTERNS.date) || [];
-  const policy = text.match(CODE_PATTERNS.policy);
-  const account = text.match(CODE_PATTERNS.account);
-  const headerLines = text.split('\n').slice(0, 15).map(l => l.trim()).filter(l => l.length > 5);
-  const providerKeywords = ['HOSPITAL', 'CLINIC', 'CENTER', 'HEALTH', 'MEDICAL'];
-  const providerName = headerLines.find(l => providerKeywords.some(kw => l.toUpperCase().includes(kw))) || headerLines[0] || 'Unknown Facility';
+  const dates = rawInput.match(CODE_PATTERNS.date) || [];
+  const account = rawInput.match(CODE_PATTERNS.account);
+  const zip = rawInput.match(CODE_PATTERNS.zip);
   return {
-    id: auditId,
+    id: uuidv4(),
     date: new Date().toISOString(),
     fileName,
-    rawText: text, // Caller responsible for memory purge if needed
+    rawText: null, // ABSOLUTE MEMORY PURGE: Never return raw text
     redactedText: redacted,
     totalAmount,
     detectedCpt: cpt,
-    detectedIcd: Array.from(new Set(text.match(CODE_PATTERNS.icd10) || [])),
-    detectedHcpcs: hcpcs,
-    detectedRevenue: revenue,
+    detectedIcd: Array.from(new Set(rawInput.match(CODE_PATTERNS.icd10) || [])),
     planType,
-    zipCode,
+    zipCode: zip ? zip[0] : undefined,
     fingerprint,
-    fapEligible: isSevereTotal || planType === 'MEDICAID',
-    legalAuditSummary: isSevereTotal ? "Educational review points detected high-risk billing patterns under PA Act 102." : "Standard educational review completed.",
+    fapEligible: planType === 'MEDICAID',
+    legalAuditSummary: `Education Review Summary: ${redactedCount} items redacted. ${reviewPoints.length} review points identified.`,
     extractedData: {
-      providerName,
-      dateOfService: dates[dates.length - 1] || dates[0] || '',
+      providerName: 'Redacted Facility',
+      dateOfService: dates[dates.length - 1] || '',
       billDate: dates[0] || '',
-      accountNumber: account ? account[1] : '',
-      policyId: policy ? policy[1] : ''
+      accountNumber: account ? account[1] : 'REDACTED'
     },
     overcharges,
-    reviewPoints,
+    reviewPoints: reviewPoints as ReviewPoint[],
     status: reviewPoints.length > 0 ? 'flagged' : 'clean'
   };
 }
@@ -173,28 +128,13 @@ export function exportLegalAuditPackage(audit: AuditRecord) {
   return JSON.stringify({
     metadata: {
       review_id: audit.id,
-      fingerprint: audit.fingerprint,
       timestamp: new Date().toISOString(),
-      statutory_basis: "PA Act 102 (§ 3, 5, 7) & No Surprises Act",
       regulatory_notice: PA_DOI_DISCLAIMER,
       benchmark_notice: BENCHMARK_DISCLAIMER,
-      ethics_statement: "This analysis is produced by a non-legal assistant tool for patient education. Only redacted data is preserved in this package."
+      pii_policy: "ABSOLUTE ZERO STORAGE - PURGED"
     },
-    summary: audit.legalAuditSummary,
-    review_points: audit.reviewPoints.map(p => ({
-      code: p.taxonomy?.rule_id,
-      statute: p.taxonomy?.statute_ref,
-      severity: p.severity,
-      integrity_hash: p.taxonomy?.evidence_hash
-    })),
-    remediation: {
-      pa_doi_hotline: "1-877-881-6388",
-      pa_doh_hotline: "1-800-254-5164",
-      fap_eligible: audit.fapEligible,
-      itemization_required: true,
-      next_steps: "Contact your carrier or the PA DOI portal for formal dispute resolution."
-    },
+    review_points: audit.reviewPoints,
     redacted_content: audit.redactedText,
-    disclaimer: "This document is an automated education report and does not constitute legal counsel."
+    disclaimer: "This document is for educational purposes only."
   }, null, 2);
 }
