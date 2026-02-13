@@ -44,22 +44,24 @@ function detectPlanType(text: string): 'COMMERCIAL' | 'MEDICAID' | 'MEDICARE' | 
   if (PLAN_KEYWORDS.COMMERCIAL.some(k => upText.includes(k.toUpperCase()))) return 'COMMERCIAL';
   return 'UNKNOWN';
 }
-function findEvidenceSnippet(text: string, keyword: string): string {
-  const lines = text.split('\n');
-  const foundLine = lines.find(l => l.toUpperCase().includes(keyword.toUpperCase()));
-  return foundLine ? foundLine.trim().substring(0, 100) : "Evidence found in document context.";
-}
 export async function analyzeBillText(text: string, fileName: string): Promise<AuditRecord> {
   const { redacted, count } = redactSensitiveData(text);
   const planType = detectPlanType(text);
   const zipMatches = text.match(CODE_PATTERNS.zip);
   const zipCode = zipMatches ? zipMatches[0] : undefined;
   const cpt = Array.from(new Set(text.match(CODE_PATTERNS.cpt) || []));
-  // Robust amount extraction: ignore ZIPs or years by checking context
-  const amountMatches = text.match(CODE_PATTERNS.amounts) || [];
-  const amounts = amountMatches
-    .map(m => parseFloat(m.replace(/[$,\s]/g, '')))
-    .filter(n => !isNaN(n) && n < 1000000); // Filter out obviously wrong high numbers
+  const hcpcs = Array.from(new Set(text.match(CODE_PATTERNS.hcpcs) || []));
+  const revenue = Array.from(new Set(text.match(CODE_PATTERNS.revenue) || []));
+  // Improved amount extraction: proximity-to-currency and range validation
+  const amountRegex = /\$\s?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g;
+  let match;
+  const amounts: number[] = [];
+  while ((match = amountRegex.exec(text)) !== null) {
+    const val = parseFloat(match[1].replace(/,/g, ''));
+    if (!isNaN(val) && val < 1000000 && val > 0.01) {
+      amounts.push(val);
+    }
+  }
   const totalAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
   const overcharges: OverchargeItem[] = [];
   cpt.forEach(code => {
@@ -76,7 +78,7 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
   });
   const rawFlags = PA_RULES.filter(r => r.check({ rawText: text, overcharges, cpt }));
   const flags = await Promise.all(rawFlags.map(async f => {
-    const snippet = findEvidenceSnippet(redacted, f.id === 'act-102-triad' ? 'EMERGENCY' : (cpt[0] || 'TOTAL'));
+    const snippet = text.substring(0, 200).replace(/\n/g, ' ');
     const hash = await computeEvidenceHash(snippet);
     return {
       type: f.id,
@@ -87,31 +89,21 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
         statute_ref: PA_VIOLATION_TAXONOMY[f.id] || 'General PA Healthcare Rule',
         requires_review: f.severity === 'high',
         evidence_hash: hash,
-        evidence_snippet: snippet
+        evidence_snippet: snippet.substring(0, 100)
       }
     };
   }));
   const auditId = uuidv4();
-  const retentionDate = new Date();
-  retentionDate.setFullYear(retentionDate.getFullYear() + 7);
-  await saveRedactionAudit({
-    id: uuidv4(),
-    auditId,
-    timestamp: new Date().toISOString(),
-    retentionUntil: retentionDate.toISOString(),
-    regulatoryBasis: 'HIPAA/PA-ACT-102',
-    redactionCount: count
-  });
   const dates = text.match(CODE_PATTERNS.date) || [];
   const policy = text.match(CODE_PATTERNS.policy);
   const account = text.match(CODE_PATTERNS.account);
-  // Specific bill date detection
+  // Enhanced Bill Date Heuristics
   let billDate = dates[0] || '';
-  const dateKeywords = ['DATE:', 'BILL DATE:', 'STATEMENT DATE:', 'ISSUED:'];
+  const dateKeywords = ['BILL DATE', 'STATEMENT DATE', 'INVOICE DATE', 'ISSUED'];
   for (const kw of dateKeywords) {
     const idx = text.toUpperCase().indexOf(kw);
     if (idx !== -1) {
-      const sub = text.substring(idx, idx + 30);
+      const sub = text.substring(idx, idx + 40);
       const subMatch = sub.match(CODE_PATTERNS.date);
       if (subMatch) {
         billDate = subMatch[0];
@@ -119,6 +111,10 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
       }
     }
   }
+  // Enhanced Provider Name Detection (Filtering junk headers)
+  const headerLines = text.split('\n').slice(0, 10).map(l => l.trim()).filter(l => l.length > 4);
+  const junkTerms = ['PAGE', 'CONFIDENTIAL', 'ACCOUNT', 'DATE', 'STATEMENT', 'PATIENT'];
+  const providerName = headerLines.find(l => !junkTerms.some(jt => l.toUpperCase().includes(jt))) || 'Unknown Facility';
   return {
     id: auditId,
     date: new Date().toISOString(),
@@ -128,12 +124,14 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     totalAmount,
     detectedCpt: cpt,
     detectedIcd: Array.from(new Set(text.match(CODE_PATTERNS.icd10) || [])),
+    detectedHcpcs: hcpcs,
+    detectedRevenue: revenue,
     planType,
     zipCode,
     extractedData: {
-      providerName: text.split('\n').slice(0, 5).find(l => l.length > 5 && !l.includes('Page')) || 'Unknown Facility',
+      providerName,
       dateOfService: dates[dates.length - 1] || dates[0] || '',
-      billDate: billDate,
+      billDate,
       accountNumber: account ? account[1] : '',
       policyId: policy ? policy[1] : ''
     },

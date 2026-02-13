@@ -1,15 +1,28 @@
 import { v4 as uuidv4 } from 'uuid';
-import { 
-  INSURANCE_PATTERNS, 
-  PLAN_KEYWORDS, 
-  PA_VIOLATION_TAXONOMY, 
-  REDACTION_PATTERNS 
+import * as XLSX from 'xlsx';
+import {
+  INSURANCE_PATTERNS,
+  PLAN_KEYWORDS,
+  PA_VIOLATION_TAXONOMY,
+  REDACTION_PATTERNS
 } from '@/data/constants';
 import { InsuranceFilingRecord, AuditFlag } from './db';
 import * as pdfjs from 'pdfjs-dist';
-// Re-using the worker config from audit-engine
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 export async function extractTextFromFiling(file: File): Promise<string> {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  if (extension === 'xlsx') {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer);
+    let fullText = '';
+    workbook.SheetNames.forEach(sheetName => {
+      const worksheet = workbook.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      fullText += `Sheet: ${sheetName}\n` + json.map((row: any) => row.join(' ')).join('\n') + '\n';
+    });
+    return fullText;
+  }
+  // Default to PDF
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
   let fullText = '';
@@ -29,29 +42,26 @@ function redactFilingText(text: string): string {
 }
 export async function analyzeInsuranceFiling(text: string, fileName: string): Promise<InsuranceFilingRecord> {
   const upText = text.toUpperCase();
-  // Detect Carrier
+  // Detect Carrier with improved robustness
   let carrier = 'Unknown Carrier';
   for (const [key, keywords] of Object.entries(PLAN_KEYWORDS)) {
-    if (keywords.some(k => upText.includes(k.toUpperCase()))) {
-      carrier = key.charAt(0) + key.slice(1).toLowerCase();
-      // Try to find specific company name if possible
-      const specificMatch = keywords.find(k => upText.includes(k.toUpperCase()));
-      if (specificMatch) carrier = specificMatch;
+    const found = keywords.find(k => {
+      const regex = new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      return regex.test(text);
+    });
+    if (found) {
+      carrier = found;
       break;
     }
   }
-  // Extract Rate Hike
   const hikeMatch = text.match(INSURANCE_PATTERNS.rate_hike);
   const rateHike = hikeMatch ? hikeMatch[0].replace(/[^\d.-]/g, '') + '%' : 'TBD';
   const rateHikeVal = hikeMatch ? parseFloat(hikeMatch[0].replace(/[^\d.-]/g, '')) : 0;
-  // Extract MLR
   const mlrMatch = text.match(INSURANCE_PATTERNS.mlr);
   const mlrPercent = mlrMatch ? mlrMatch[0].replace(/[^\d.-]/g, '') + '%' : 'TBD';
   const mlrVal = mlrMatch ? parseFloat(mlrMatch[0].replace(/[^\d.-]/g, '')) : 85;
-  // Extract AV
   const avMatch = text.match(INSURANCE_PATTERNS.actuarial_value);
   const avLevel = avMatch ? avMatch[0].replace(/[^\d.-]/g, '') + '%' : 'TBD';
-  // Extract County Pricing (Simulated via Regex Heuristics for Table-like structures)
   const countyPricing: Record<string, number> = {};
   const commonCounties = ['Allegheny', 'Philadelphia', 'Montgomery', 'Bucks', 'Delaware', 'Lancaster', 'Chester'];
   commonCounties.forEach(county => {
@@ -61,7 +71,6 @@ export async function analyzeInsuranceFiling(text: string, fileName: string): Pr
       countyPricing[county] = parseFloat(match[1]);
     }
   });
-  // Flagging Logic
   const flags: AuditFlag[] = [];
   if (rateHikeVal > 15) {
     flags.push({

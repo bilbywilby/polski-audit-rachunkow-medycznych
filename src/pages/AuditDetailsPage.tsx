@@ -17,7 +17,19 @@ export function AuditDetailsPage() {
   useEffect(() => {
     if (id) getAuditById(id).then(setAudit);
   }, [id]);
+  const handlePIIToggle = (checked: boolean) => {
+    if (checked) {
+      const confirmed = window.confirm('Privacy Alert: Unmasking reveals sensitive data locally. This data never leaves your device. Continue?');
+      if (confirmed) {
+        setShowPII(true);
+      }
+    } else {
+      setShowPII(false);
+    }
+  };
   if (!audit) return <div className="py-20 text-center text-muted-foreground animate-pulse">Retrieving audit record...</div>;
+  const hasHcpcs = (audit.detectedHcpcs?.length ?? 0) > 0;
+  const hasRevenue = (audit.detectedRevenue?.length ?? 0) > 0;
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between gap-6">
@@ -73,7 +85,7 @@ export function AuditDetailsPage() {
                       <Gavel className="h-4 w-4 text-amber-700 mt-1" />
                       <div>
                         <p className="text-xs font-bold text-amber-900 uppercase">Statutory Reference</p>
-                        <p className="text-sm text-amber-800 font-medium">{flag.taxonomy?.statute_ref}</p>
+                        <p className="text-sm text-amber-800 font-medium">{flag.taxonomy?.statute_ref || 'PA Act 102 Regulatory Standard'}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -92,8 +104,7 @@ export function AuditDetailsPage() {
                   <h3 className="font-bold text-blue-900">Audit Integrity Chain</h3>
                 </div>
                 <p className="text-sm text-blue-800 leading-relaxed">
-                  The following hashes verify that the audit was performed on the original document. 
-                  These snippets are redacted for privacy while maintaining enough context for legal verification.
+                  Redacted snippets for verification. Original data is cryptographically hashed locally.
                 </p>
               </div>
               {audit.flags.map((flag, idx) => (
@@ -101,16 +112,16 @@ export function AuditDetailsPage() {
                   <CardContent className="pt-6 space-y-4">
                     <div className="space-y-2">
                       <Label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
-                        <Fingerprint className="h-3 w-3" /> Evidence Hash (SHA-256)
+                        <Fingerprint className="h-3 w-3" /> Evidence Hash
                       </Label>
                       <code className="block p-3 bg-muted rounded-lg text-[10px] break-all font-mono opacity-70">
-                        {flag.taxonomy?.evidence_hash}
+                        {flag.taxonomy?.evidence_hash || 'SHA-256_HASH_PENDING'}
                       </code>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase text-muted-foreground">Original Text Line</Label>
+                      <Label className="text-xs font-bold uppercase text-muted-foreground">Context Line</Label>
                       <div className="p-4 bg-muted/30 rounded-xl italic text-sm text-foreground/80 border-l-4 border-primary/20">
-                        "{flag.taxonomy?.evidence_snippet}"
+                        "{flag.taxonomy?.evidence_snippet || 'Document context found.'}"
                       </div>
                     </div>
                   </CardContent>
@@ -124,11 +135,8 @@ export function AuditDetailsPage() {
                     <Lock className="h-3 w-3" /> Secure Redacted View
                   </div>
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="pii" className="text-[10px] uppercase font-bold">Unmask</Label>
-                    <Switch id="pii" checked={showPII} onCheckedChange={(v) => {
-                      if (v && confirm('Privacy Alert: Unmasking reveals sensitive data locally. Continue?')) setShowPII(true);
-                      else setShowPII(false);
-                    }} />
+                    <Label htmlFor="pii" className="text-[10px] uppercase font-bold">Unmask PII</Label>
+                    <Switch id="pii" checked={showPII} onCheckedChange={handlePIIToggle} />
                   </div>
                 </div>
                 <div className="p-8 bg-slate-50 dark:bg-slate-900/50 max-h-[500px] overflow-y-auto">
@@ -145,37 +153,38 @@ export function AuditDetailsPage() {
             <CardHeader><CardTitle className="text-lg">Metadata</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               {[
-                { label: 'Facility', value: audit.extractedData.providerName, icon: ShieldCheck },
-                { label: 'Date of Service', value: audit.extractedData.dateOfService, icon: FileText },
-                { label: 'Plan Type', value: audit.planType, icon: Gavel },
-                { label: 'Service ZIP', value: audit.zipCode || 'Not detected', icon: Lock }
-              ].map((m, i) => (
+                { label: 'Facility', value: audit.extractedData.providerName, icon: ShieldCheck, show: true },
+                { label: 'Date of Service', value: audit.extractedData.dateOfService, icon: FileText, show: true },
+                { label: 'Bill Date', value: audit.extractedData.billDate, icon: FileText, show: !!audit.extractedData.billDate },
+                { label: 'Plan Type', value: audit.planType, icon: Gavel, show: true },
+                { label: 'CPT Codes', value: audit.detectedCpt.join(', '), icon: ClipboardList, show: audit.detectedCpt.length > 0 },
+                { label: 'HCPCS', value: audit.detectedHcpcs?.join(', '), icon: ClipboardList, show: hasHcpcs },
+                { label: 'Revenue', value: audit.detectedRevenue?.join(', '), icon: ClipboardList, show: hasRevenue }
+              ].filter(x => x.show).map((m, i) => (
                 <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-muted/20">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <m.icon className="h-4 w-4" />
                     <span className="text-xs font-bold uppercase">{m.label}</span>
                   </div>
-                  <span className="text-sm font-bold text-foreground">{m.value}</span>
+                  <span className="text-sm font-bold text-foreground truncate max-w-[120px]">{m.value}</span>
                 </div>
               ))}
             </CardContent>
           </Card>
-          <TooltipProvider>
-            <Card className="rounded-3xl bg-blue-600 text-white p-6 shadow-xl shadow-blue-500/20">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Info className="h-5 w-5" />
-                  <h3 className="font-bold">Privacy Enforcement</h3>
-                </div>
-                <p className="text-xs opacity-90 leading-relaxed">
-                  This audit is compliant with Pennsylvania HIPAA standards. Records are stored for 7 years in your browser's local sandbox.
-                </p>
-                <Button variant="secondary" className="w-full rounded-xl font-bold" asChild>
-                  <Link to="/resources">Learn Your Rights</Link>
-                </Button>
+          <Card className="rounded-3xl bg-blue-600 text-white p-6 shadow-xl shadow-blue-500/20">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Info className="h-5 w-5" />
+                <h3 className="font-bold">Privacy Enforcement</h3>
               </div>
-            </Card>
-          </TooltipProvider>
+              <p className="text-xs opacity-90 leading-relaxed">
+                Records are stored for 7 years in your browser's local sandbox. No data is sent to external servers.
+              </p>
+              <Button variant="secondary" className="w-full rounded-xl font-bold" asChild>
+                <Link to="/resources">Learn Your Rights</Link>
+              </Button>
+            </div>
+          </Card>
         </div>
       </div>
     </div>

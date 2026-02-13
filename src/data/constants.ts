@@ -1,46 +1,35 @@
 export type Language = 'en' | 'pl';
-export const GLOSSARY_TERMS = {
+export const GLOSSARY_TERMS: Record<Language, { term: string; definition: string }[]> = {
   en: [
     { term: "Adjustment", definition: "The difference between the provider's charge and the allowed amount, usually written off by the provider." },
     { term: "Allowed Amount", definition: "The maximum amount a plan will pay for a covered health care service." },
-    { term: "Assignment of Benefits", definition: "An agreement where the patient requests the insurance company to pay the provider directly." },
     { term: "Balance Billing", definition: "When a provider bills you for the difference between their charge and the allowed amount. Often prohibited by the No Surprises Act." },
-    { term: "Bundling", definition: "Grouping several related procedures into one single code for billing purposes." },
-    { term: "Co-insurance", definition: "Your share of the costs of a covered health care service, calculated as a percent of the allowed amount." },
-    { term: "Co-payment", definition: "A fixed amount you pay for a covered health care service, usually when you receive the service." },
     { term: "CPT Code", definition: "Current Procedural Terminology. A 5-digit code used to describe medical, surgical, and diagnostic services." },
-    { term: "Deductible", definition: "The amount you owe for health care services before your health insurance or plan begins to pay." },
-    { term: "Denied Claim", definition: "A claim for payment that an insurance company refuses to pay." },
-    { term: "Durable Medical Equipment (DME)", definition: "Equipment and supplies ordered by a health care provider for everyday or extended use." },
-    { term: "Encounter Form", definition: "Also known as a superbill. A document used by providers to record services rendered for billing." },
     { term: "Explanation of Benefits (EOB)", definition: "A statement from your insurer explaining what was covered and what you owe." },
-    { term: "HCPCS Code", definition: "Healthcare Common Procedure Coding System. Used primarily for billing supplies and services not in CPT." },
-    { term: "ICD-10 Code", definition: "International Classification of Diseases, 10th Revision. Diagnostic codes used to track every condition." },
-    { term: "Itemized Bill", definition: "A detailed statement showing every specific service, supply, and medication billed." },
-    { term: "Medical Necessity", definition: "Health care services or supplies needed to prevent, diagnose, or treat an illness or injury." },
-    { term: "Modifier", definition: "A two-digit code added to a CPT code to provide extra information about the service." },
-    { term: "Network Provider", definition: "A provider who has a contract with your health insurer to provide services at discounted rates." },
-    { term: "Out-of-Pocket Maximum", definition: "The most you have to pay for covered services in a plan year." },
-    { term: "Pre-authorization", definition: "A decision by your health insurer that a service or drug is medically necessary." },
-    { term: "Professional Component", definition: "The part of a service that is provided by the physician, distinct from the equipment or facility." },
-    { term: "Revenue Code", definition: "A four-digit code used on hospital bills to tell the insurer which department the service was in." },
-    { term: "Superbill", definition: "An itemized list of services used by providers to submit for reimbursement." },
-    { term: "Telemedicine", definition: "Health care services provided using telecommunications technology." },
-    { term: "Unbundling", definition: "The illegal practice of billing multiple codes for a procedure that should be billed under one code." },
-    { term: "Upcoding", definition: "Assigning a higher-level code than the service actually performed to increase payment." },
-    { term: "UCR (Usual, Customary, Reasonable)", definition: "The amount paid for a medical service in a geographic area based on what providers usually charge." },
     { term: "No Surprises Act", definition: "Federal law protecting patients from unexpected medical bills for emergency services." },
     { term: "Act 102 (PA)", definition: "Pennsylvania law requiring hospitals to provide an itemized bill within 30 days of a request." }
   ],
-  pl: []
+  pl: [
+    { term: "Korekta (Adjustment)", definition: "Różnica między opłatą dostawcy a kwotą dopuszczalną, zazwyczaj umarzana przez dostawcę." },
+    { term: "Kwota Dopuszczalna", definition: "Maksymalna kwota, jaką plan zapłaci za objętą usługę opieki zdrowotnej." },
+    { term: "Balance Billing", definition: "Gdy dostawca wystawia rachunek na różnicę między jego opłatą a kwotą dopuszczalną. Często zabronione przez No Surprises Act." },
+    { term: "Kod CPT", definition: "Current Procedural Terminology. 5-cyfrowy kod używany do opisu usług medycznych i diagnostycznych." },
+    { term: "Wyjaśnienie Świadczeń (EOB)", definition: "Oświadczenie od ubezpieczyciela wyjaśniające, co zosta��o objęte ubezpieczeniem i ile jesteś winien." },
+    { term: "No Surprises Act", definition: "Federalna ustawa chroniąca pacjentów przed nieoczekiwanymi rachunkami medycznymi za usługi ratunkowe." },
+    { term: "Ustawa 102 (PA)", definition: "Prawo Pensylwanii wymagające od szpitali dostarczenia szczegółowego rachunku w ciągu 30 dni od żądania." }
+  ]
 };
-export const PA_RESOURCES = {
+export const PA_RESOURCES: Record<Language, { name: string; description: string; url: string }[]> = {
   en: [
     { name: "PA Insurance Department", description: "State agency overseeing insurance and enforcing the No Surprises Act in Pennsylvania.", url: "https://www.insurance.pa.gov/" },
     { name: "PA Health Law Project", description: "Provides free legal services to Pennsylvanians having trouble accessing healthcare.", url: "https://www.phlp.org/" },
     { name: "PA Attorney General", description: "Protects consumers from unfair business practices, including predatory billing.", url: "https://www.attorneygeneral.gov/" }
   ],
-  pl: []
+  pl: [
+    { name: "Departament Ubezpieczeń PA", description: "Agencja stanowa nadzorująca ubezpieczenia i egzekwująca ustawę No Surprises Act w Pensylwanii.", url: "https://www.insurance.pa.gov/" },
+    { name: "PA Health Law Project", description: "Zapewnia bezpłatne usługi prawne mieszkańcom Pensylwanii mającym problemy z dostępem do opieki zdrowotnej.", url: "https://www.phlp.org/" },
+    { name: "Prokurator Generalny PA", description: "Chroni konsumentów przed nieuczciwymi praktykami biznesowymi, w tym drapieżnym fakturowaniem.", url: "https://www.attorneygeneral.gov/" }
+  ]
 };
 export const PID_RESOURCES = [
   { name: "PA Insurance Dept (PID) Filings", url: "https://www.insurance.pa.gov/Companies/ProductServices/Pages/Health-Insurance-Rate-Filings.aspx", type: "regulatory" },
@@ -95,12 +84,6 @@ export const FAIR_BENCHMARKS: Record<string, number> = {
   "80053": 55,
   "85025": 45
 };
-export const FAIR_RATE_BENCHMARKS: Record<string, Record<string, number>> = {
-  "Allegheny": { "Bronze": 380, "Silver": 495, "Gold": 590 },
-  "Philadelphia": { "Bronze": 420, "Silver": 540, "Gold": 650 },
-  "Montgomery": { "Bronze": 410, "Silver": 525, "Gold": 630 },
-  "Default": { "Bronze": 400, "Silver": 510, "Gold": 610 }
-};
 export const PA_RULES = [
   {
     id: 'balance-billing',
@@ -121,20 +104,9 @@ export const PA_RULES = [
       const hasOON = text.includes('OUT-OF-NETWORK') || text.includes('NON-PARTICIPATING') || text.includes('OON');
       return hasEmergency && hasFacility && hasOON;
     }
-  },
-  {
-    id: 'unbundling-detected',
-    name: 'Potential Unbundling',
-    description: 'Multiple related codes detected that should likely be billed as a single bundled procedure.',
-    severity: 'medium' as const,
-    check: (ctx: { cpt: string[] }) => {
-      const hasOfficeVisit = ctx.cpt.some(c => c.startsWith('9921'));
-      const hasMinorLab = ctx.cpt.some(c => c === '80053' || c === '85025');
-      return hasOfficeVisit && hasMinorLab;
-    }
   }
 ];
-export const LETTER_TEMPLATES = {
+export const LETTER_TEMPLATES: Record<Language, { id: string; name: string; description: string; body: string }[]> = {
   en: [
     {
       id: "us-itemized-request",
@@ -147,31 +119,20 @@ export const LETTER_TEMPLATES = {
       name: "No Surprises Act Violation Dispute",
       description: "Dispute out-of-network charges for emergency services.",
       body: "To: Billing Department\nRe: Dispute of Out-of-Network Charges (No Surprises Act)\n\nI am formally disputing the bill for services on {SERVICE_DATE} at {PROVIDER_NAME}. As these were emergency services, federal law (42 U.S.C. § 300gg-111) prohibits balance billing. My responsibility should be limited to in-network cost-sharing amounts."
-    },
-    {
-      id: "balance-billing-protest",
-      name: "Balance Billing Protest",
-      description: "General protest against being billed for the difference between provider charges and allowed amounts.",
-      body: "To: {PROVIDER_NAME}\nRe: Balance Billing Protest\n\nI am writing to protest the balance billing of ${TOTAL_AMOUNT} on my account {ACCOUNT_NUMBER}. I believe these charges exceed the allowed amount under my plan and may violate Pennsylvania consumer protection laws regarding fair market pricing."
-    },
-    {
-      id: "fmr-negotiation",
-      name: "Fair Market Rate Negotiation",
-      description: "Offer to pay based on local 80th percentile benchmarks.",
-      body: "To: Billing Department\n\nI have audited my bill dated {BILL_DATE} and found that the charges exceed the 80th percentile for fair market rates in my ZIP code. I am prepared to settle this account for ${TOTAL_AMOUNT} (Fair Market Rate) to resolve this matter immediately."
-    },
-    {
-      id: "financial-hardship",
-      name: "Hardship/Financial Assistance",
-      description: "Request a reduction based on financial need or charity care policies.",
-      body: "To: Patient Financial Services\n\nI am writing to request financial assistance or a hardship discount for my bill totaling ${TOTAL_AMOUNT}. I am a resident of Pennsylvania and would like to apply for any charity care or payment plan programs your facility offers under state guidelines."
-    },
-    {
-      id: "error-correction",
-      name: "Error Correction Request",
-      description: "Request correction of specific coding errors like unbundling or upcoding.",
-      body: "To: Coding and Billing Department\n\nUpon review of my itemized bill, I have identified potential coding errors (Unbundling/Upcoding). Specifically, the CPT codes used do not accurately reflect the level of service documented. I request a formal coding review of account {ACCOUNT_NUMBER}."
     }
   ],
-  pl: []
+  pl: [
+    {
+      id: "pl-itemized-request",
+      name: "Wniosek o Rachunek Szczegółowy (Act 102)",
+      description: "Poproś o szczegółowe zestawienie opłat zgodnie z prawem stanowym PA.",
+      body: "Do: Dział Rozliczeń\nDotyczy: Wniosek o rachunek szczegółowy (PA Act 102)\n\nZwracam się z prośbą o dostarczenie szczegółowego, wyszczególnionego zestawienia usług wykonanych w dniu {SERVICE_DATE} (Konto: {ACCOUNT_NUMBER}). Zgodnie z ustawą PA Act 102, mam prawo do otrzymania rachunku zawierającego kody CPT/HCPCS oraz indywidualne ceny za każdą pozycję. Proszę o dostarczenie go w ciągu 30 dni."
+    },
+    {
+      id: "pl-nsa-violation",
+      name: "Spór dot. No Surprises Act",
+      description: "Zakwestionuj opłaty poza siecią za usługi ratunkowe.",
+      body: "Do: Dział Rozliczeń\nDotyczy: Kwestionowanie opłat poza siecią (No Surprises Act)\n\nFormalnie kwestionuję rachunek za usługi z dnia {SERVICE_DATE} w {PROVIDER_NAME}. Ponieważ były to usługi ratunkowe, prawo federalne (42 U.S.C. § 300gg-111) zabrania wystawiania rachunków wyrównawczych (balance billing). Moja odpowiedzialność powinna ograniczać się do kwot udziału w kosztach wewnątrz sieci."
+    }
+  ]
 };

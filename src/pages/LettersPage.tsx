@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,17 @@ import { Copy, Printer, FileText, CheckCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { AuditRecord } from '@/lib/db';
 import { jsPDF } from 'jspdf';
+import { useLanguage } from '@/hooks/use-language';
 export function LettersPage() {
   const location = useLocation();
+  const { language } = useLanguage();
   const audit = location.state?.audit as AuditRecord | undefined;
-  const templates = LETTER_TEMPLATES.en;
-  const [selected, setSelected] = useState(templates[0]);
+  const templates = useMemo(() => {
+    return (LETTER_TEMPLATES[language] && LETTER_TEMPLATES[language].length > 0)
+      ? LETTER_TEMPLATES[language]
+      : LETTER_TEMPLATES.en;
+  }, [language]);
+  const [selected, setSelected] = useState(templates[0] || LETTER_TEMPLATES.en[0]);
   const [form, setForm] = useState({
     name: '',
     city: 'Philadelphia',
@@ -25,7 +31,13 @@ export function LettersPage() {
     billDate: audit?.extractedData.billDate || '',
     amount: audit?.totalAmount ? `${audit.totalAmount}` : ''
   });
+  useEffect(() => {
+    if (templates.length > 0) {
+      setSelected(templates[0]);
+    }
+  }, [templates]);
   const letterBody = useMemo(() => {
+    if (!selected) return "";
     let body = selected.body;
     const map: Record<string, string> = {
       '{SERVICE_DATE}': form.date || '[DATE OF SERVICE]',
@@ -44,6 +56,10 @@ export function LettersPage() {
     window.print();
   };
   const handleDownloadPDF = () => {
+    if (!form.name || !form.accountNumber) {
+      toast.error("Required Fields Missing", { description: "Please fill in patient name and account number before exporting." });
+      return;
+    }
     const doc = new jsPDF();
     const splitText = doc.splitTextToSize(letterBody, 170);
     doc.setFont("times", "normal");
