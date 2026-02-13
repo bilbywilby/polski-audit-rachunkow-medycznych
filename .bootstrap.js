@@ -83,7 +83,7 @@ function runSetupCommands() {
     "bun add idb@^8.0.0",
     "bun add recharts@2.15.4",
     "bun add uuid@^11.1.0",
-    "bun add xlsx jspdf mathjs fuse.js"
+    "bun add xlsx fuse.js jspdf mathjs"
 ];
     
     if (commands.length === 0) {
