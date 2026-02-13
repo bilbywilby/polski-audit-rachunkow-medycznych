@@ -21,6 +21,8 @@ export interface AuditRecord {
   extractedData: {
     providerName?: string;
     dateOfService?: string;
+    billDate?: string;
+    accountNumber?: string;
     policyId?: string;
     allDates?: string[];
   };

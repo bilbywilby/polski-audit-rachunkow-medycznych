@@ -18,7 +18,7 @@ export function LettersPage() {
     provider: passedAudit?.extractedData.providerName || '',
     accountNumber: passedAudit?.extractedData.accountNumber || '',
     dateOfService: passedAudit?.extractedData.dateOfService || '',
-    amountDisputed: passedAudit?.totalAmount ? `$${passedAudit.totalAmount.toLocaleString()}` : '',
+    amountDisputed: passedAudit?.totalAmount ? `${passedAudit.totalAmount.toLocaleString()}` : '',
     policyInfo: passedAudit?.extractedData.policyId ? `Member ID: ${passedAudit.extractedData.policyId}` : ''
   });
   useEffect(() => {
@@ -34,7 +34,7 @@ export function LettersPage() {
   const letterContent = useMemo(() => {
     let body = selectedTemplate.body;
     const benchmarkComparison = passedAudit?.overcharges?.length
-      ? passedAudit.overcharges.map(o => `CPT ${o.code}: PA Avg $${o.benchmarkAmount} vs Billed $${o.billedAmount} (+${o.percentOver}%)`).join('; ')
+      ? passedAudit.overcharges.map(o => `CPT ${o.code}: PA Avg ${o.benchmarkAmount} vs Billed ${o.billedAmount} (+${o.percentOver}%)`).join('; ')
       : 'Billed amount significantly exceeds regional benchmarks for services performed.';
     const replacements: Record<string, string> = {
       '{SERVICE_DATE}': formData.dateOfService || '[SERVICE DATE]',
@@ -113,12 +113,30 @@ export function LettersPage() {
             <div className="space-y-4 border rounded-2xl p-6 bg-muted/20">
               <h3 className="text-lg font-bold flex items-center gap-2"><FileText className="h-4 w-4" /> Personalize</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1"><Label>Full Name</Label><Input placeholder="Your Name" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} /></div>
-                <div className="space-y-1"><Label>Hospital</Label><Input placeholder="Facility Name" value={formData.provider} onChange={e => setFormData(p => ({...p, provider: e.target.value}))} /></div>
-                <div className="space-y-1"><Label>Account #</Label><Input placeholder="Account/Invoice" value={formData.accountNumber} onChange={e => setFormData(p => ({...p, accountNumber: e.target.value}))} /></div>
-                <div className="space-y-1"><Label>Date of Service</Label><Input placeholder="MM/DD/YYYY" value={formData.dateOfService} onChange={e => setFormData(p => ({...p, dateOfService: e.target.value}))} /></div>
-                <div className="space-y-1"><Label>Billed Amount</Label><Input placeholder="$0.00" value={formData.amountDisputed} onChange={e => setFormData(p => ({...p, amountDisputed: e.target.value}))} /></div>
-                <div className="space-y-1"><Label>Policy Details</Label><Input placeholder="Insurer/ID" value={formData.policyInfo} onChange={e => setFormData(p => ({...p, policyInfo: e.target.value}))} /></div>
+                <div className="space-y-1">
+                  <Label>Full Name</Label>
+                  <Input placeholder="Your Name" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Hospital</Label>
+                  <Input placeholder="Facility Name" value={formData.provider} onChange={e => setFormData(p => ({...p, provider: e.target.value}))} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Account #</Label>
+                  <Input placeholder="Account/Invoice" value={formData.accountNumber} onChange={e => setFormData(p => ({...p, accountNumber: e.target.value}))} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Date of Service</Label>
+                  <Input placeholder="MM/DD/YYYY" value={formData.dateOfService} onChange={e => setFormData(p => ({...p, dateOfService: e.target.value}))} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Billed Amount</Label>
+                  <Input placeholder="$0.00" value={formData.amountDisputed} onChange={e => setFormData(p => ({...p, amountDisputed: e.target.value}))} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Policy Details</Label>
+                  <Input placeholder="Insurer/ID" value={formData.policyInfo} onChange={e => setFormData(p => ({...p, policyInfo: e.target.value}))} />
+                </div>
               </div>
             </div>
           </div>
@@ -126,8 +144,12 @@ export function LettersPage() {
             <div className="flex justify-between items-center no-print">
               <h2 className="text-2xl font-bold">Preview</h2>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleCopy} className="rounded-xl"><Copy className="h-4 w-4 mr-2" /> Copy</Button>
-                <Button variant="default" size="sm" onClick={handlePrint} className="rounded-xl shadow-md"><Printer className="h-4 w-4 mr-2" /> Print</Button>
+                <Button variant="outline" size="sm" onClick={handleCopy} className="rounded-xl">
+                  <Copy className="h-4 w-4 mr-2" /> Copy
+                </Button>
+                <Button variant="default" size="sm" onClick={handlePrint} className="rounded-xl shadow-md">
+                  <Printer className="h-4 w-4 mr-2" /> Print
+                </Button>
               </div>
             </div>
             <Card className="shadow-2xl print:shadow-none print:border-none rounded-none border-t-4 border-t-primary">
@@ -136,7 +158,9 @@ export function LettersPage() {
                   <Lock className="h-2 w-2" /> Local Processing Only
                 </div>
                 <div className="space-y-8" id="letter-preview-content">
-                  <div className="text-right text-xs"><p>Date: {new Date().toLocaleDateString()}</p></div>
+                  <div className="text-right text-xs">
+                    <p>Date: {new Date().toLocaleDateString()}</p>
+                  </div>
                   <div>
                     <p className="font-bold">{formData.name || "[YOUR FULL NAME]"}</p>
                     <p>[YOUR STREET ADDRESS]</p>

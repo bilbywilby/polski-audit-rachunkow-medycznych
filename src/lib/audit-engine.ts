@@ -33,9 +33,7 @@ function extractSmartData(text: string) {
   const dateMatches = text.match(CODE_PATTERNS.date) || [];
   const policyMatch = text.match(CODE_PATTERNS.policy);
   const accountMatch = text.match(CODE_PATTERNS.account);
-  // Heuristic: The earliest date is often the service date, latest is bill date
   const sortedDates = [...new Set(dateMatches)].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-  // Provider Extraction: Look for hospital keywords in first 20 lines
   let providerName = '';
   const providerKeywords = ['Hospital', 'Clinic', 'Medical Center', 'Health', 'Specialists', 'Physicians', 'Surgery Center'];
   const lines = text.split('\n');
@@ -57,7 +55,6 @@ function extractSmartData(text: string) {
 export async function analyzeBillText(text: string, fileName: string): Promise<AuditRecord> {
   const redactedText = redactSensitiveData(text);
   const smartData = extractSmartData(text);
-  // Extract Codes
   const cptMatches = Array.from(new Set(text.match(CODE_PATTERNS.cpt) || []));
   const icdMatches = Array.from(new Set(text.match(CODE_PATTERNS.icd10) || []));
   const hcpcsMatches = Array.from(new Set(text.match(CODE_PATTERNS.hcpcs) || []));
@@ -66,17 +63,15 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
   const amountsMatches = text.match(CODE_PATTERNS.amounts) || [];
   const amounts = amountsMatches.map(m => parseFloat(m.replace(/[$,\s]/g, ''))).filter(n => !isNaN(n));
   const totalAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
-  // Benchmark Calculation
   const overcharges: OverchargeItem[] = [];
   cptMatches.forEach(code => {
     const benchmark = PA_COST_BENCHMARKS.find(b => b.code === code);
     if (benchmark) {
-      // Logic: If this is a primary code and total bill is significantly higher than benchmark
       if (totalAmount > benchmark.avgCost * 1.15) {
         overcharges.push({
           code,
           description: benchmark.description,
-          billedAmount: totalAmount, // For demo, we assume the high bill is driven by this code
+          billedAmount: totalAmount,
           benchmarkAmount: benchmark.avgCost,
           percentOver: Math.round(((totalAmount - benchmark.avgCost) / benchmark.avgCost) * 100)
         });
@@ -107,8 +102,8 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
       providerName: smartData.providerName,
       dateOfService: smartData.serviceDate,
       billDate: smartData.billDate,
-      policyId: smartData.policyId,
       accountNumber: smartData.accountNumber,
+      policyId: smartData.policyId,
       allDates: smartData.allDates
     },
     overcharges,
