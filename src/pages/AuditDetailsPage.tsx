@@ -36,7 +36,7 @@ export function AuditDetailsPage() {
   }, [id, navigate]);
   const togglePII = (checked: boolean) => {
     if (checked) {
-      if (confirm('Warning: This will reveal personal details (Policy IDs, Account #s). Continue?')) {
+      if (confirm('Ostrzeżenie: Ta operacja odkryje dane wrażliwe (PESEL, Nr Konta). Czy chcesz kontynuować?')) {
         setShowPII(true);
       }
     } else {
@@ -45,12 +45,13 @@ export function AuditDetailsPage() {
   };
   const handleCopySummary = () => {
     if (!audit) return;
-    const summary = `Audit Summary: ${audit.fileName}\nProvider: ${audit.extractedData.providerName}\nDate: ${audit.extractedData.dateOfService}\nTotal: $${audit.totalAmount}\nFlags: ${audit.flags.length}`;
+    const summary = `Podsumowanie Audytu: ${audit.fileName}\nPlacówka: ${audit.extractedData.providerName}\nData: ${audit.extractedData.dateOfService}\nKwota: ${audit.totalAmount}\nFlagi: ${audit.flags.length}`;
     navigator.clipboard.writeText(summary);
-    toast.success('Summary copied to clipboard');
+    toast.success('Skopiowano podsumowanie');
   };
-  if (loading) return <div className="py-20 text-center italic text-muted-foreground">Loading audit...</div>;
+  if (loading) return <div className="py-20 text-center italic text-muted-foreground">Wczytywanie audytu...</div>;
   if (!audit) return null;
+  const hasPesel = audit.detectedNpi && audit.detectedNpi.length > 0;
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 space-y-8 animate-fade-in">
@@ -58,20 +59,22 @@ export function AuditDetailsPage() {
           <div className="space-y-3">
             <Button variant="ghost" asChild className="mb-2 -ml-4 hover:bg-transparent px-0">
               <Link to="/history" className="flex items-center text-muted-foreground hover:text-primary">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to History
+                <ArrowLeft className="mr-2 h-4 w-4" /> Powrót do historii
               </Link>
             </Button>
             <h1 className="text-4xl font-display font-bold tracking-tight">{audit.fileName}</h1>
             <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
               <Badge variant="outline" className="text-xs font-bold border-primary/20 bg-primary/5">
-                Processed: {format(new Date(audit.date), 'MMM d, yyyy')}
+                Przetworzono: {format(new Date(audit.date), 'dd.MM.yyyy')}
               </Badge>
               <Badge variant={audit.status === 'clean' ? 'secondary' : 'destructive'}>
                 {audit.status.toUpperCase()}
               </Badge>
-              <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
-                <ShieldCheck className="h-3 w-3" /> Secure Locally
-              </div>
+              {hasPesel && (
+                <Badge variant="outline" className="text-xs font-bold border-amber-500/20 bg-amber-500/5 text-amber-600">
+                  Wykryto PESEL
+                </Badge>
+              )}
             </div>
           </div>
           <div className="flex gap-3 h-fit">
@@ -79,33 +82,33 @@ export function AuditDetailsPage() {
               <Copy className="h-5 w-5" />
             </Button>
             <Button asChild className="rounded-xl shadow-lg shadow-primary/20 px-6">
-              <Link to="/letters" state={{ audit }}>Dispute Bill <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Link to="/letters" state={{ audit }}>Generuj Pismo <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card className="rounded-2xl border-none bg-muted/30 shadow-none p-6">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Provider</p>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Placówka</p>
             <p className="font-bold text-foreground line-clamp-1">{audit.extractedData.providerName}</p>
           </Card>
           <Card className="rounded-2xl border-none bg-muted/30 shadow-none p-6">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Service Date</p>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Data Usługi</p>
             <p className="font-bold text-foreground">{audit.extractedData.dateOfService || 'N/A'}</p>
           </Card>
           <Card className="rounded-2xl border-none bg-muted/30 shadow-none p-6">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Account #</p>
-            <p className="font-bold text-foreground">{showPII ? (audit.extractedData.accountNumber || 'N/A') : '[REDACTED]'}</p>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Nr Konta</p>
+            <p className="font-bold text-foreground">{showPII ? (audit.extractedData.accountNumber || 'N/A') : '[ZAMASKOWANO]'}</p>
           </Card>
           <Card className="rounded-2xl border-none bg-muted/30 shadow-none p-6">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Policy ID</p>
-            <p className="font-bold text-foreground">{showPII ? (audit.extractedData.policyId || 'N/A') : '[REDACTED]'}</p>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Nr Polisy</p>
+            <p className="font-bold text-foreground">{showPII ? (audit.extractedData.policyId || 'N/A') : '[ZAMASKOWANO]'}</p>
           </Card>
         </div>
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="bg-muted p-1 rounded-xl">
-            <TabsTrigger value="overview" className="rounded-lg px-6">Findings</TabsTrigger>
-            <TabsTrigger value="benchmarks" className="rounded-lg px-6">Cost Analysis</TabsTrigger>
-            <TabsTrigger value="raw" className="rounded-lg px-6">Inspector</TabsTrigger>
+            <TabsTrigger value="overview" className="rounded-lg px-6">Wnioski</TabsTrigger>
+            <TabsTrigger value="benchmarks" className="rounded-lg px-6">Analiza Kosztów</TabsTrigger>
+            <TabsTrigger value="raw" className="rounded-lg px-6">Inspektor</TabsTrigger>
           </TabsList>
           <TabsContent value="overview" className="space-y-8 outline-none">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -114,24 +117,24 @@ export function AuditDetailsPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-xl">
                       <ClipboardCheck className="h-5 w-5 text-primary" />
-                      Smart Extraction
+                      Ekstrakcja Kodów
                     </CardTitle>
-                    <CardDescription>Verified billing codes and identifiers.</CardDescription>
+                    <CardDescription>Zweryfikowane kody NFZ i procedury.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-8">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                       <div className="space-y-3">
-                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-widest">CPT (Procedures)</p>
+                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-widest">CPT/ICD-9 (Procedury)</p>
                         <div className="flex flex-wrap gap-2">
                           {audit.detectedCpt.map(c => <Badge key={c} className="bg-blue-100 text-blue-800 border-none">{c}</Badge>)}
-                          {audit.detectedCpt.length === 0 && <span className="text-sm italic text-muted-foreground">None</span>}
+                          {audit.detectedCpt.length === 0 && <span className="text-sm italic text-muted-foreground">Brak</span>}
                         </div>
                       </div>
                       <div className="space-y-3">
-                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-widest">ICD-10 (Diagnosis)</p>
+                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-widest">ICD-10 (Diagnozy)</p>
                         <div className="flex flex-wrap gap-2">
                           {audit.detectedIcd.map(c => <Badge key={c} variant="outline" className="border-indigo-200 text-indigo-700">{c}</Badge>)}
-                          {audit.detectedIcd.length === 0 && <span className="text-sm italic text-muted-foreground">None</span>}
+                          {audit.detectedIcd.length === 0 && <span className="text-sm italic text-muted-foreground">Brak</span>}
                         </div>
                       </div>
                     </div>
@@ -139,8 +142,8 @@ export function AuditDetailsPage() {
                 </Card>
                 <div className="p-8 bg-primary text-primary-foreground rounded-2xl flex justify-between items-center shadow-lg shadow-primary/10">
                   <div className="space-y-1">
-                    <p className="text-sm font-medium opacity-80 uppercase tracking-widest">Billed Total</p>
-                    <p className="text-4xl font-bold">${audit.totalAmount.toLocaleString()}</p>
+                    <p className="text-sm font-medium opacity-80 uppercase tracking-widest">Suma Rachunku</p>
+                    <p className="text-4xl font-bold">{audit.totalAmount.toLocaleString()} PLN</p>
                   </div>
                   <Lock className="h-10 w-10 opacity-20" />
                 </div>
@@ -149,7 +152,7 @@ export function AuditDetailsPage() {
                 <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900 rounded-2xl border-2">
                   <CardHeader>
                     <CardTitle className="text-amber-900 dark:text-amber-400 flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5" /> Audit Flags
+                      <AlertTriangle className="h-5 w-5" /> Flagi Audytu
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6 space-y-4">
@@ -164,8 +167,8 @@ export function AuditDetailsPage() {
                     )) : (
                       <div className="text-center py-6">
                         <ShieldCheck className="h-10 w-10 text-green-500 mx-auto mb-2" />
-                        <p className="text-sm font-bold text-green-700">Audit Passed</p>
-                        <p className="text-xs text-green-600">No red flags found.</p>
+                        <p className="text-sm font-bold text-green-700">Audyt Pomyślny</p>
+                        <p className="text-xs text-green-600">Nie wykryto czerwonych flag.</p>
                       </div>
                     )}
                   </CardContent>
@@ -178,9 +181,9 @@ export function AuditDetailsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-primary" />
-                  PA Regional Benchmarks
+                  Benchmarki NFZ / Regionalne
                 </CardTitle>
-                <CardDescription>Comparison against 2024-2025 Pennsylvania averages.</CardDescription>
+                <CardDescription>Porównanie ze średnimi stawkami rynkowymi 2024-2025.</CardDescription>
               </CardHeader>
               <CardContent>
                 {audit.overcharges.length > 0 ? (
@@ -188,11 +191,11 @@ export function AuditDetailsPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b text-muted-foreground text-xs uppercase tracking-widest font-bold">
-                          <th className="text-left py-4 px-2">Code</th>
-                          <th className="text-left py-4 px-2">Service</th>
-                          <th className="text-right py-4 px-2">Billed</th>
-                          <th className="text-right py-4 px-2">PA Avg.</th>
-                          <th className="text-right py-4 px-2">Diff.</th>
+                          <th className="text-left py-4 px-2">Kod</th>
+                          <th className="text-left py-4 px-2">Usługa</th>
+                          <th className="text-right py-4 px-2">Naliczono</th>
+                          <th className="text-right py-4 px-2">Średnia</th>
+                          <th className="text-right py-4 px-2">Różnica</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y text-sm">
@@ -200,8 +203,8 @@ export function AuditDetailsPage() {
                           <tr key={idx} className="hover:bg-muted/30">
                             <td className="py-5 px-2 font-mono font-bold">{item.code}</td>
                             <td className="py-5 px-2 text-muted-foreground">{item.description}</td>
-                            <td className="py-5 px-2 text-right font-bold">${item.billedAmount.toLocaleString()}</td>
-                            <td className="py-5 px-2 text-right text-muted-foreground">${item.benchmarkAmount.toLocaleString()}</td>
+                            <td className="py-5 px-2 text-right font-bold">{item.billedAmount.toLocaleString()} PLN</td>
+                            <td className="py-5 px-2 text-right text-muted-foreground">{item.benchmarkAmount.toLocaleString()} PLN</td>
                             <td className="py-5 px-2 text-right font-bold text-red-500">+{item.percentOver}%</td>
                           </tr>
                         ))}
@@ -211,7 +214,7 @@ export function AuditDetailsPage() {
                 ) : (
                   <div className="py-20 text-center text-muted-foreground">
                     <Landmark className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                    No pricing anomalies found for detected codes.
+                    Nie wykryto anomalii cenowych dla zidentyfikowanych kodów.
                   </div>
                 )}
               </CardContent>
@@ -221,13 +224,13 @@ export function AuditDetailsPage() {
             <Card className="rounded-2xl shadow-sm overflow-hidden">
               <CardHeader className="bg-muted/30 flex flex-row items-center justify-between py-6">
                 <div>
-                  <CardTitle className="text-lg">Document Inspector</CardTitle>
-                  <CardDescription>Review raw extraction with privacy controls.</CardDescription>
+                  <CardTitle className="text-lg">Inspektor Dokumentu</CardTitle>
+                  <CardDescription>Przeglądaj wyodrębniony tekst z kontrolą prywatności.</CardDescription>
                 </div>
                 <div className="flex items-center space-x-3 bg-white dark:bg-black p-2 rounded-lg border">
                   <Label htmlFor="pii-toggle" className="flex items-center gap-2 text-xs font-bold cursor-pointer">
                     {showPII ? <Eye className="h-4 w-4 text-red-500" /> : <EyeOff className="h-4 w-4" />}
-                    REVEAL PII
+                    ODKRYJ DANE
                   </Label>
                   <Switch id="pii-toggle" checked={showPII} onCheckedChange={togglePII} />
                 </div>

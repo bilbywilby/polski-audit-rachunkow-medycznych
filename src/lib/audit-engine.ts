@@ -35,7 +35,11 @@ function extractSmartData(text: string) {
   const allDateMatches = [...dateMatches, ...dateAltMatches];
   const policyMatch = text.match(CODE_PATTERNS.policy);
   const accountMatch = text.match(CODE_PATTERNS.account);
-  const sortedDates = [...new Set(allDateMatches)].sort((a, b) => new Date(a.split('.').reverse().join('-')).getTime() - new Date(b.split('.').reverse().join('-')).getTime());
+  const sortedDates = [...new Set(allDateMatches)].sort((a, b) => {
+    const dateA = new Date(a.split('.').reverse().join('-'));
+    const dateB = new Date(b.split('.').reverse().join('-'));
+    return dateA.getTime() - dateB.getTime();
+  });
   let providerName = '';
   const providerKeywords = ['Szpital', 'Przychodnia', 'Centrum Medyczne', 'Klinika', 'Hospital', 'Clinic', 'Specialists'];
   const lines = text.split('\n');
@@ -61,7 +65,11 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
   const icdMatches = Array.from(new Set(text.match(CODE_PATTERNS.icd10) || []));
   const peselMatches = Array.from(new Set(text.match(CODE_PATTERNS.pesel) || []));
   const amountsMatches = text.match(CODE_PATTERNS.amounts) || [];
-  const amounts = amountsMatches.map(m => parseFloat(m.replace(/[PLNzł$,\s]/g, '').replace(',', '.'))).filter(n => !isNaN(n));
+  const amounts = amountsMatches.map(m => {
+    // Standardize Polish currency (comma for decimal, remove text)
+    const sanitized = m.replace(/[PLNzł$,\s]/g, '').replace(',', '.');
+    return parseFloat(sanitized);
+  }).filter(n => !isNaN(n));
   const totalAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
   const overcharges: OverchargeItem[] = [];
   cptMatches.forEach(code => {
@@ -93,7 +101,7 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     totalAmount,
     detectedCpt: cptMatches,
     detectedIcd: icdMatches,
-    detectedNpi: peselMatches, // Repurposing NPI field for PESEL detection matches in this locale
+    detectedNpi: peselMatches,
     extractedData: {
       providerName: smartData.providerName,
       dateOfService: smartData.serviceDate,
@@ -104,6 +112,6 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     },
     overcharges,
     flags,
-    status: flags.length > 0 ? 'flagged' : (overcharges.length > 0 ? 'flagged' : 'clean')
+    status: (flags.length > 0 || overcharges.length > 0) ? 'flagged' : 'clean'
   };
 }

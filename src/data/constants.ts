@@ -2,10 +2,10 @@ export type Language = 'pl' | 'en';
 export const GLOSSARY_TERMS = {
   pl: [
     { term: "PESEL redakcja", definition: "Proces usuwania lub maskowania 11-cyfrowego numeru identyfikacyjnego w celu ochrony prywatności." },
-    { term: "NFZ Refundacja", definition: "Pokrycie części lub całości kosztów leków, wyrobów medycznych i świadczeń ze środków publicznych." },
+    { term: "NFZ Refundacja", definition: "Pokrycie części lub ca��ości kosztów leków, wyrobów medycznych i świadczeń ze środków publicznych." },
     { term: "Ubezpieczenie zdrowotne", definition: "Obowiązkowa składka uprawniająca do bezpłatnej opieki medycznej w ramach publicznego systemu (NFZ)." },
     { term: "IKP (Internetowe Konto Pacjenta)", definition: "Bezpłatna aplikacja Ministerstwa Zdrowia z historią leczenia, e-receptami i skierowaniami." },
-    { term: "Współpłacenie", definition: "Sytuacja, w której pacjent pokrywa część kosztów świadczenia mimo posiadania ubezpieczenia." },
+    { term: "Współpłacenie", definition: "Sytuacja, w której pacjent pokrywa częś�� kosztów świadczenia mimo posiadania ubezpieczenia." },
     { term: "Kod ICD-10", definition: "Międzynarodowa klasyfikacja chorób używana do celów statystycznych i rozliczeniowych." },
     { term: "Kod CPT/ICD-9 PL", definition: "Kody procedur medycznych używane do opisu wykonanych badań i zabiegów." },
     { term: "RODO", definition: "Ogólne rozporządzenie o ochronie danych osobowych obowiązujące w UE, chroniące dane medyczne." },
@@ -31,7 +31,7 @@ export const PA_RESOURCES = {
   pl: [
     { name: "NFZ (Narodowy Fundusz Zdrowia)", description: "Publiczny płatnik finansujący świadczenia opieki zdrowotnej.", url: "https://www.nfz.gov.pl/" },
     { name: "pacjent.gov.pl", description: "Oficjalny portal Ministerstwa Zdrowia i NFZ dla pacjentów.", url: "https://pacjent.gov.pl/" },
-    { name: "Rzecznik Praw Pacjenta", description: "Organ dbający o ochronę praw pacjentów w Polsce.", url: "https://www.gov.pl/web/rpp" },
+    { name: "Rzecznik Praw Pacjenta", description: "Organ dbający o ochron�� praw pacjentów w Polsce.", url: "https://www.gov.pl/web/rpp" },
     { name: "Biuro Rzecznika Finansowego", description: "Pomoc w sporach z ubezpieczycielami (ubezpieczenia dobrowolne).", url: "https://rf.gov.pl/" }
   ],
   en: [
@@ -46,8 +46,8 @@ export const CODE_PATTERNS = {
   amounts: /(?:PLN|zł|\$)\s?\d+(?:[.,]\d{3})*(?:[.,]\d{2})?\b/g,
   policy: /\b(?:ID|Nr|Polisa|Member)\s*(?:#|No\.?)?\s*([A-Z0-9-]{6,15})\b/i,
   account: /\b(?:Konto|Faktura|Account|Bill|Invoice)\s*(?:#|No\.?)?\s*([A-Z0-9-]{5,20})\b/i,
-  date: /\b(0?[1-9]|[12][0-9]|3[01])[- /.](0?[1-9]|1[012])[- /.](19|20)\d\d\b/g, // DD.MM.YYYY
-  dateAlt: /\b(0?[1-9]|1[012])[- /.](0?[1-9]|[12][0-9]|3[01])[- /.](19|20)\d\d\b/g // MM/DD/YYYY
+  date: /\b(0?[1-9]|[12][0-9]|3[01])[- /.](0?[1-9]|1[012])[- /.](19|20)\d\d\b/g,
+  dateAlt: /\b(0?[1-9]|1[012])[- /.](0?[1-9]|[12][0-9]|3[01])[- /.](19|20)\d\d\b/g
 };
 export const REDACTION_PATTERNS = {
   pesel: /\b\d{11}\b/g,
@@ -68,14 +68,18 @@ export const PA_RULES = [
     name: 'Wykryto PESEL',
     description: 'Dokument zawiera niezaszyfrowany numer PESEL. Zalecana natychmiastowa redakcja.',
     severity: 'high' as const,
-    check: (ctx: any) => CODE_PATTERNS.pesel.test(ctx.rawText)
+    check: (ctx: { rawText: string; codes: string[]; overcharges: any[] }) => {
+      // Use match() instead of test() to avoid stateful /g regex bugs
+      const matches = ctx.rawText.match(CODE_PATTERNS.pesel);
+      return !!(matches && matches.length > 0);
+    }
   },
   {
     id: 'nfz-overcharge',
     name: 'Ryzyko nadpłaty',
     description: 'Kwota świadczenia przekracza średnie stawki NFZ dla tej procedury.',
     severity: 'medium' as const,
-    check: (ctx: any) => ctx.overcharges.length > 0
+    check: (ctx: { rawText: string; codes: string[]; overcharges: any[] }) => ctx.overcharges.length > 0
   }
 ];
 export const LETTER_TEMPLATES = {
@@ -95,7 +99,7 @@ export const LETTER_TEMPLATES = {
     {
       id: "pl-financial-aid",
       name: "Wniosek o pomoc finansową",
-      description: "Prośba o umorzenie części kosztów ze względu na trudną sytuacj��.",
+      description: "Prośba o umorzenie części kosztów ze względu na trudną sytuację.",
       body: "W związku z trudną sytuacją materialną, zwracam się z prośbą o rozważenie możliwości obniżenia opłaty za leczenie w dniu {SERVICE_DATE}. Kwota do zapłaty wynosi {TOTAL_AMOUNT}. Proszę o potraktowanie wniosku jako prośby o pomoc socjalną."
     },
     {
@@ -117,5 +121,5 @@ export const LETTER_TEMPLATES = {
       body: "Na podstawie ustawy o prawach pacjenta, wnoszę o wydanie kopii dokumentacji medycznej z leczenia w okresie od {START_DATE} do {END_DATE}. Dokumentację odbiorę osobiście."
     }
   ],
-  en: [] // Inherit or add fallback templates if needed
+  en: []
 };
