@@ -1,6 +1,6 @@
 import * as pdfjs from 'pdfjs-dist';
-import { CODE_PATTERNS, REDACTION_PATTERNS, PA_RULES, PA_COST_BENCHMARKS } from '@/data/constants';
-import { AuditRecord, OverchargeItem } from './db';
+import { CODE_PATTERNS, REDACTION_PATTERNS, PA_RULES, FAIR_BENCHMARKS, PLAN_KEYWORDS, PA_VIOLATION_TAXONOMY } from '@/data/constants';
+import { AuditRecord, OverchargeItem, saveRedactionAudit, RedactionAuditRecord } from './db';
 import { v4 as uuidv4 } from 'uuid';
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 export async function extractTextFromPdf(file: File): Promise<string> {
@@ -21,81 +21,104 @@ export async function extractTextFromPdf(file: File): Promise<string> {
   }
   return fullText;
 }
-function redactSensitiveData(text: string): string {
+function redactSensitiveData(text: string): { redacted: string; count: number } {
   let redacted = text;
+  let count = 0;
   Object.values(REDACTION_PATTERNS).forEach(pattern => {
+    const matches = redacted.match(pattern);
+    if (matches) count += matches.length;
     redacted = redacted.replace(pattern, '[REDACTED]');
   });
-  return redacted;
+  return { redacted, count };
 }
-function extractSmartData(text: string) {
-  const dates = text.match(CODE_PATTERNS.date) || [];
-  const policy = text.match(CODE_PATTERNS.policy);
-  const account = text.match(CODE_PATTERNS.account);
-  let providerName = '';
-  const keywords = ['Hospital', 'Clinic', 'Medical Center', 'Health', 'Specialists', 'Physicians'];
+async function computeEvidenceHash(snippet: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(snippet);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function detectPlanType(text: string): 'COMMERCIAL' | 'MEDICAID' | 'MEDICARE' | 'UNKNOWN' {
+  const upText = text.toUpperCase();
+  if (PLAN_KEYWORDS.MEDICAID.some(k => upText.includes(k.toUpperCase()))) return 'MEDICAID';
+  if (PLAN_KEYWORDS.MEDICARE.some(k => upText.includes(k.toUpperCase()))) return 'MEDICARE';
+  if (PLAN_KEYWORDS.COMMERCIAL.some(k => upText.includes(k.toUpperCase()))) return 'COMMERCIAL';
+  return 'UNKNOWN';
+}
+function findEvidenceSnippet(text: string, keyword: string): string {
   const lines = text.split('\n');
-  for (const line of lines.slice(0, 15)) {
-    if (keywords.some(kw => line.includes(kw))) {
-      providerName = line.trim();
-      break;
-    }
-  }
-  return {
-    providerName: providerName || 'Unknown Provider',
-    dateOfService: dates[0] || '', // Changed from serviceDate to dateOfService
-    billDate: dates[dates.length - 1] || '',
-    policyId: policy ? policy[1] : '',
-    accountNumber: account ? account[1] : '',
-    allDates: dates
-  };
+  const foundLine = lines.find(l => l.toUpperCase().includes(keyword.toUpperCase()));
+  return foundLine ? foundLine.trim().substring(0, 100) : "Evidence found in aggregate document structure.";
 }
 export async function analyzeBillText(text: string, fileName: string): Promise<AuditRecord> {
-  const redactedText = redactSensitiveData(text);
-  const smart = extractSmartData(text);
+  const { redacted, count } = redactSensitiveData(text);
+  const planType = detectPlanType(text);
+  const zipMatches = text.match(CODE_PATTERNS.zip);
+  const zipCode = zipMatches ? zipMatches[0] : undefined;
   const cpt = Array.from(new Set(text.match(CODE_PATTERNS.cpt) || []));
-  const hcpcs = Array.from(new Set(text.match(CODE_PATTERNS.hcpcs) || []));
-  const icd = Array.from(new Set(text.match(CODE_PATTERNS.icd10) || []));
-  const rev = Array.from(new Set(text.match(CODE_PATTERNS.revenue) || []));
-  const npi = Array.from(new Set(text.match(CODE_PATTERNS.npi) || []));
   const amountMatches = text.match(CODE_PATTERNS.amounts) || [];
   const amounts = amountMatches.map(m => parseFloat(m.replace(/[$,\s]/g, ''))).filter(n => !isNaN(n));
   const totalAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
   const overcharges: OverchargeItem[] = [];
   cpt.forEach(code => {
-    const benchmark = PA_COST_BENCHMARKS.find(b => b.code === code);
-    if (benchmark && totalAmount > benchmark.avgCost * 1.5) {
+    const fairVal = FAIR_BENCHMARKS[code];
+    if (fairVal && totalAmount > fairVal * 1.15) {
       overcharges.push({
         code,
-        description: benchmark.description,
+        description: `Potential overcharge (Above 80th percentile PA benchmark)`,
         billedAmount: totalAmount,
-        benchmarkAmount: benchmark.avgCost,
-        percentOver: Math.round(((totalAmount - benchmark.avgCost) / benchmark.avgCost) * 100)
+        benchmarkAmount: fairVal,
+        percentOver: Math.round(((totalAmount - fairVal) / fairVal) * 100)
       });
     }
   });
-  const flags = PA_RULES
-    .filter(r => r.check({ rawText: text, codes: cpt, overcharges }))
-    .map(r => ({ type: r.id, severity: r.severity, description: r.description }));
-  return {
+  const rawFlags = PA_RULES.filter(r => r.check({ rawText: text, overcharges }));
+  const flags = await Promise.all(rawFlags.map(async f => {
+    const snippet = findEvidenceSnippet(redacted, f.id === 'act-102-triad' ? 'EMERGENCY' : (cpt[0] || 'TOTAL'));
+    const hash = await computeEvidenceHash(snippet);
+    return {
+      type: f.id,
+      severity: f.severity,
+      description: f.description,
+      taxonomy: {
+        rule_id: f.id,
+        statute_ref: PA_VIOLATION_TAXONOMY[f.id] || 'General PA Healthcare Rule',
+        requires_review: f.severity === 'high',
+        evidence_hash: hash,
+        evidence_snippet: snippet
+      }
+    };
+  }));
+  const auditId = uuidv4();
+  // Log privacy audit
+  const retentionDate = new Date();
+  retentionDate.setFullYear(retentionDate.getFullYear() + 7);
+  await saveRedactionAudit({
     id: uuidv4(),
+    auditId,
+    timestamp: new Date().toISOString(),
+    retentionUntil: retentionDate.toISOString(),
+    regulatoryBasis: 'HIPAA/PA-ACT-102',
+    redactionCount: count
+  });
+  const dates = text.match(CODE_PATTERNS.date) || [];
+  const policy = text.match(CODE_PATTERNS.policy);
+  const account = text.match(CODE_PATTERNS.account);
+  return {
+    id: auditId,
     date: new Date().toISOString(),
     fileName,
     rawText: text,
-    redactedText,
+    redactedText: redacted,
     totalAmount,
     detectedCpt: cpt,
-    detectedIcd: icd,
-    detectedHcpcs: hcpcs,
-    detectedRevenue: rev,
-    detectedNpi: npi,
+    detectedIcd: Array.from(new Set(text.match(CODE_PATTERNS.icd10) || [])),
+    planType,
+    zipCode,
     extractedData: {
-      providerName: smart.providerName,
-      dateOfService: smart.dateOfService,
-      billDate: smart.billDate,
-      accountNumber: smart.accountNumber,
-      policyId: smart.policyId,
-      allDates: smart.allDates
+      providerName: text.split('\n').slice(0, 5).find(l => l.length > 5) || 'Unknown',
+      dateOfService: dates[0] || '',
+      accountNumber: account ? account[1] : '',
+      policyId: policy ? policy[1] : ''
     },
     overcharges,
     flags,

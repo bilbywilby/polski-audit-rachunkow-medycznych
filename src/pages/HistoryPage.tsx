@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllAudits, deleteAudit, AuditRecord, saveAudit } from '@/lib/db';
+import { getAllAudits, deleteAudit, AuditRecord, clearAllHistory } from '@/lib/db';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Calendar, FileText, Trash2, ArrowUpRight, Search, ShieldCheck, Eraser, AlertCircle } from 'lucide-react';
+import { Calendar, FileText, Trash2, ArrowUpRight, Search, Eraser, Gavel, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -37,16 +37,13 @@ export function HistoryPage() {
   };
   const handleClearAll = async () => {
     if (audits.length === 0) return;
-    if (!confirm('WARNING: This will permanently delete ALL local audit history. This action cannot be undone. Proceed?')) return;
-    if (!confirm('FINAL CONFIRMATION: Are you absolutely sure?')) return;
+    if (!confirm('WARNING: This will permanently delete ALL local audit history and privacy logs. Proceed?')) return;
     try {
-      for (const audit of audits) {
-        await deleteAudit(audit.id);
-      }
+      await clearAllHistory();
       setAudits([]);
-      toast.success('All history cleared');
+      toast.success('All history and privacy logs cleared');
     } catch (e) {
-      toast.error('Failed to clear some records');
+      toast.error('Failed to clear records');
       loadAudits();
     }
   };
@@ -70,7 +67,7 @@ export function HistoryPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div className="space-y-1">
             <h1 className="text-4xl font-display font-bold">Audit History</h1>
-            <p className="text-lg text-muted-foreground">Your locally stored medical billing audits.</p>
+            <p className="text-lg text-muted-foreground">Privacy-compliant local billing records.</p>
           </div>
           <div className="flex gap-3">
             {audits.length > 0 && (
@@ -95,20 +92,8 @@ export function HistoryPage() {
         {filteredAudits.length === 0 ? (
           <Card className="border-dashed py-24 text-center rounded-3xl bg-muted/5">
             <CardContent className="flex flex-col items-center gap-6">
-              <div className="p-6 bg-muted rounded-full">
-                <FileText className="h-12 w-12 text-muted-foreground/30" />
-              </div>
-              <div className="space-y-2">
-                <p className="text-2xl font-bold">No records found</p>
-                <p className="text-muted-foreground max-w-xs mx-auto">
-                  {searchTerm ? `No audits match "${searchTerm}"` : "Secure your first medical bill by starting a new audit today."}
-                </p>
-              </div>
-              {!searchTerm && (
-                <Button asChild className="rounded-xl px-8 h-12">
-                  <Link to="/audit">Start First Audit</Link>
-                </Button>
-              )}
+              <FileText className="h-12 w-12 text-muted-foreground/30" />
+              <p className="text-xl font-bold">No records found</p>
             </CardContent>
           </Card>
         ) : (
@@ -117,15 +102,17 @@ export function HistoryPage() {
               <Card key={audit.id} className="group hover:shadow-xl transition-all duration-300 rounded-3xl border-muted/60 flex flex-col overflow-hidden">
                 <CardHeader className="pb-4">
                   <div className="flex justify-between items-start gap-2">
-                    <Badge
-                      variant={audit.status === 'clean' ? 'secondary' : 'destructive'}
-                      className={`px-3 ${audit.status === 'clean' ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}`}
-                    >
-                      {audit.status.toUpperCase()}
-                    </Badge>
+                    <div className="flex gap-1.5">
+                      <Badge variant={audit.status === 'clean' ? 'secondary' : 'destructive'} className="px-3">
+                        {audit.status.toUpperCase()}
+                      </Badge>
+                      <Badge variant="outline" className="bg-blue-50/50 text-blue-700 border-blue-100 flex items-center gap-1">
+                        <Gavel className="h-3 w-3" /> {audit.planType}
+                      </Badge>
+                    </div>
                     <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       <Calendar className="h-3.5 w-3.5" />
-                      {format(new Date(audit.date), 'MMM d, yyyy')}
+                      {format(new Date(audit.date), 'MMM d, yy')}
                     </span>
                   </div>
                   <CardTitle className="text-xl line-clamp-1 mt-4 group-hover:text-primary transition-colors">
@@ -135,9 +122,13 @@ export function HistoryPage() {
                     ${audit.totalAmount.toLocaleString()} Billed
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="flex-1 pb-6 space-y-2">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Provider</p>
-                  <p className="text-sm font-medium line-clamp-1 italic">{audit.extractedData.providerName || 'N/A'}</p>
+                <CardContent className="flex-1 pb-6 space-y-4">
+                   <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1">
+                      <ShieldCheck className="h-3 w-3" /> Facility
+                    </p>
+                    <p className="text-sm font-medium line-clamp-1 italic">{audit.extractedData.providerName || 'N/A'}</p>
+                  </div>
                 </CardContent>
                 <CardFooter className="flex justify-between gap-3 border-t bg-muted/20 p-5">
                   <Button
