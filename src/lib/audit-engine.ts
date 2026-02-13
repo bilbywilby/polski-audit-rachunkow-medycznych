@@ -1,6 +1,6 @@
 import * as pdfjs from 'pdfjs-dist';
 import { CODE_PATTERNS, REDACTION_PATTERNS, PA_RULES, FAIR_BENCHMARKS, PLAN_KEYWORDS, PA_VIOLATION_TAXONOMY } from '@/data/constants';
-import { AuditRecord, OverchargeItem, saveRedactionAudit, RedactionAuditRecord } from './db';
+import { AuditRecord, OverchargeItem, saveRedactionAudit } from './db';
 import { v4 as uuidv4 } from 'uuid';
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 export async function extractTextFromPdf(file: File): Promise<string> {
@@ -47,7 +47,7 @@ function detectPlanType(text: string): 'COMMERCIAL' | 'MEDICAID' | 'MEDICARE' | 
 function findEvidenceSnippet(text: string, keyword: string): string {
   const lines = text.split('\n');
   const foundLine = lines.find(l => l.toUpperCase().includes(keyword.toUpperCase()));
-  return foundLine ? foundLine.trim().substring(0, 100) : "Evidence found in aggregate document structure.";
+  return foundLine ? foundLine.trim().substring(0, 100) : "Evidence found in document context.";
 }
 export async function analyzeBillText(text: string, fileName: string): Promise<AuditRecord> {
   const { redacted, count } = redactSensitiveData(text);
@@ -55,8 +55,11 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
   const zipMatches = text.match(CODE_PATTERNS.zip);
   const zipCode = zipMatches ? zipMatches[0] : undefined;
   const cpt = Array.from(new Set(text.match(CODE_PATTERNS.cpt) || []));
+  // Robust amount extraction: ignore ZIPs or years by checking context
   const amountMatches = text.match(CODE_PATTERNS.amounts) || [];
-  const amounts = amountMatches.map(m => parseFloat(m.replace(/[$,\s]/g, ''))).filter(n => !isNaN(n));
+  const amounts = amountMatches
+    .map(m => parseFloat(m.replace(/[$,\s]/g, '')))
+    .filter(n => !isNaN(n) && n < 1000000); // Filter out obviously wrong high numbers
   const totalAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
   const overcharges: OverchargeItem[] = [];
   cpt.forEach(code => {
@@ -71,7 +74,7 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
       });
     }
   });
-  const rawFlags = PA_RULES.filter(r => r.check({ rawText: text, overcharges }));
+  const rawFlags = PA_RULES.filter(r => r.check({ rawText: text, overcharges, cpt }));
   const flags = await Promise.all(rawFlags.map(async f => {
     const snippet = findEvidenceSnippet(redacted, f.id === 'act-102-triad' ? 'EMERGENCY' : (cpt[0] || 'TOTAL'));
     const hash = await computeEvidenceHash(snippet);
@@ -89,7 +92,6 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     };
   }));
   const auditId = uuidv4();
-  // Log privacy audit
   const retentionDate = new Date();
   retentionDate.setFullYear(retentionDate.getFullYear() + 7);
   await saveRedactionAudit({
@@ -103,6 +105,20 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
   const dates = text.match(CODE_PATTERNS.date) || [];
   const policy = text.match(CODE_PATTERNS.policy);
   const account = text.match(CODE_PATTERNS.account);
+  // Specific bill date detection
+  let billDate = dates[0] || '';
+  const dateKeywords = ['DATE:', 'BILL DATE:', 'STATEMENT DATE:', 'ISSUED:'];
+  for (const kw of dateKeywords) {
+    const idx = text.toUpperCase().indexOf(kw);
+    if (idx !== -1) {
+      const sub = text.substring(idx, idx + 30);
+      const subMatch = sub.match(CODE_PATTERNS.date);
+      if (subMatch) {
+        billDate = subMatch[0];
+        break;
+      }
+    }
+  }
   return {
     id: auditId,
     date: new Date().toISOString(),
@@ -115,8 +131,9 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     planType,
     zipCode,
     extractedData: {
-      providerName: text.split('\n').slice(0, 5).find(l => l.length > 5) || 'Unknown',
-      dateOfService: dates[0] || '',
+      providerName: text.split('\n').slice(0, 5).find(l => l.length > 5 && !l.includes('Page')) || 'Unknown Facility',
+      dateOfService: dates[dates.length - 1] || dates[0] || '',
+      billDate: billDate,
       accountNumber: account ? account[1] : '',
       policyId: policy ? policy[1] : ''
     },
