@@ -33,7 +33,7 @@ export const CODE_PATTERNS = {
 export const REDACTION_PATTERNS = {
   ssn: /\b\d{3}-\d{2}-\d{4}\b/g,
   phone: /\b(?:\+?1[-. ]?)?\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}\b/g,
-  email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+  email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
   dob: /\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b/g
 };
 export const PA_COST_BENCHMARKS = [
