@@ -5,98 +5,58 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { getAllAudits, AuditRecord } from '@/lib/db';
 import { useLanguage } from '@/hooks/use-language';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 export function HomePage() {
   const [audits, setAudits] = useState<AuditRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   useEffect(() => {
-    async function loadData() {
-      try {
-        const data = await getAllAudits();
-        setAudits(data);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
+    getAllAudits().then(setAudits);
   }, []);
   const stats = useMemo(() => {
-    const totalValue = audits.reduce((s, a) => s + a.totalAmount, 0);
-    const flaggedAudits = audits.filter(a => a.status === 'flagged');
-    const flaggedAmount = flaggedAudits.reduce((s, a) => s + a.totalAmount, 0);
-    const savingsPotential = flaggedAudits.reduce((s, a) => s + (a.totalAmount * 0.25), 0);
-    return {
-      totalValue,
-      flaggedCount: flaggedAudits.length,
-      flaggedAmount,
-      savingsPotential,
-      hasAudits: audits.length > 0
-    };
+    const total = audits.reduce((s, a) => s + a.totalAmount, 0);
+    const flagged = audits.filter(a => a.status === 'flagged');
+    const flaggedAmt = flagged.reduce((s, a) => s + a.totalAmount, 0);
+    return { total, flaggedCount: flagged.length, flaggedAmt, hasAudits: audits.length > 0 };
   }, [audits]);
   const chartData = useMemo(() => {
     return audits.slice(0, 5).reverse().map(a => ({
-      name: a.fileName.length > 10 ? a.fileName.substring(0, 8) + '...' : a.fileName,
+      name: a.fileName.substring(0, 10),
       amount: a.totalAmount
     }));
   }, [audits]);
-  if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Zap className="h-10 w-10 text-primary animate-pulse" />
-      </div>
-    );
-  }
   if (!stats.hasAudits) {
     return (
-      <div className="max-w-4xl mx-auto space-y-16 py-12 animate-fade-in">
+      <div className="max-w-4xl mx-auto space-y-16 py-12">
         <section className="text-center space-y-6">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium border border-primary/20">
-            <Shield className="h-4 w-4" />
-            <span>{t('home.title')}</span>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
+            <Shield className="h-4 w-4" /> <span>Pennsylvania Healthcare Defense</span>
           </div>
-          <h1 className="text-5xl md:text-7xl font-display font-bold leading-tight tracking-tight text-foreground">
-            {language === 'pl' ? 'Audytuj faktury' : "Don't pay a bill"} <br />
-            <span className="text-primary italic">{language === 'pl' ? 'zanim zapłacisz.' : 'until you audit it.'}</span>
+          <h1 className="text-5xl md:text-7xl font-display font-bold text-foreground">
+            Don't pay a bill <br /><span className="text-primary italic">until you audit it.</span>
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            {language === 'pl'
-              ? 'BillGuard PL automatycznie wykrywa błędy w rozliczeniach medycznych, zawyżone kody procedur oraz nielegalną redakcję danych.'
-              : 'BillGuard PL automatically detects medical billing errors and overcharged codes.'}
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Detect balance billing violations, upcoded procedures, and exercise your PA Act 102 rights instantly.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <Button asChild size="lg" className="rounded-2xl h-14 px-8 text-lg font-bold shadow-xl shadow-primary/20 hover:scale-105 transition-all">
-              <Link to="/audit">
-                <FileSearch className="mr-2 h-5 w-5" />
-                {language === 'pl' ? 'Rozpocznij Audyt' : 'Audit First Bill'}
-              </Link>
+          <div className="flex gap-4 justify-center pt-4">
+            <Button asChild size="lg" className="rounded-2xl h-14 px-8 text-lg font-bold">
+              <Link to="/audit"><FileSearch className="mr-2 h-5 w-5" /> Audit First Bill</Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="rounded-2xl h-14 px-8 text-lg border-primary/20">
-              <Link to="/glossary">{language === 'pl' ? 'Poznaj Terminologię' : 'Learn Jargon'}</Link>
+            <Button asChild variant="outline" size="lg" className="rounded-2xl h-14 px-8 text-lg">
+              <Link to="/resources">Learn Rights</Link>
             </Button>
           </div>
         </section>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
-            { title: "RODO & PESEL", desc: "Automatyczna redakcja numeru PESEL i danych wrażliwych lokalnie.", icon: Shield },
-            { title: "Zgodność z NFZ", desc: "Weryfikacja stawek wzgl��dem publicznych cenników świadczeń.", icon: Gavel },
-            { title: "Szybkie Szablony", desc: "Generowanie pism do szpitali i NFZ w języku polskim.", icon: Zap }
-          ].map((feature, i) => (
-            <Card key={i} className="rounded-3xl border-muted shadow-sm hover:shadow-md transition-shadow">
+            { title: "No Surprises Act", desc: "Federal protection from out-of-network emergency rates.", icon: Shield },
+            { title: "PA Act 102", desc: "Your state right to an itemized hospital bill within 30 days.", icon: Gavel },
+            { title: "Local Privacy", desc: "HIPAA-friendly analysis that stays on your device.", icon: Zap }
+          ].map((f, i) => (
+            <Card key={i} className="rounded-3xl hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
-                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                  <feature.icon className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="font-bold text-lg mb-2">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{feature.desc}</p>
+                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4"><f.icon className="h-6 w-6 text-primary" /></div>
+                <h3 className="font-bold text-lg mb-2">{f.title}</h3>
+                <p className="text-sm text-muted-foreground">{f.desc}</p>
               </CardContent>
             </Card>
           ))}
@@ -105,80 +65,51 @@ export function HomePage() {
     );
   }
   return (
-    <div className="space-y-10 animate-fade-in">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-        <div className="space-y-2">
-          <h1 className="text-4xl font-display font-bold">{language === 'pl' ? 'Witaj ponownie' : 'Welcome back'}</h1>
-          <p className="text-muted-foreground text-lg">
-            {language === 'pl' ? `Sprawdzono ${audits.length} faktur o wartości` : `Audited ${audits.length} bills worth`} {stats.totalValue.toLocaleString()} {language === 'pl' ? 'PLN' : 'USD'}.
-          </p>
+    <div className="space-y-10">
+      <header className="flex justify-between items-end">
+        <div>
+          <h1 className="text-4xl font-display font-bold">Health Dashboard</h1>
+          <p className="text-muted-foreground">{audits.length} local records analyzed.</p>
         </div>
-        <Button asChild size="lg" className="rounded-2xl shadow-lg shadow-primary/20 px-8">
-          <Link to="/audit"><FileSearch className="mr-2 h-5 w-5" /> {language === 'pl' ? 'Nowy Audyt' : 'New Audit'}</Link>
-        </Button>
+        <Button asChild className="rounded-2xl px-8 h-12"><Link to="/audit">New Audit</Link></Button>
       </header>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="rounded-3xl bg-primary text-primary-foreground border-none shadow-xl">
+        <Card className="rounded-3xl bg-primary text-primary-foreground border-none">
           <CardContent className="pt-6">
-            <p className="text-sm font-medium opacity-80 uppercase tracking-widest">{t('home.savings')}</p>
-            <p className="text-4xl font-bold mt-2">{stats.savingsPotential.toLocaleString()} {language === 'pl' ? 'PLN' : 'USD'}</p>
-            <p className="text-xs mt-4 flex items-center gap-1 opacity-70">
-              <CheckCircle className="h-3 w-3" /> {language === 'pl' ? 'Szacunkowa oszczędność' : 'Typical dispute outcome'}
-            </p>
+            <p className="text-sm font-medium opacity-80 uppercase">{t('home.savings')}</p>
+            <p className="text-4xl font-bold mt-2">${(stats.flaggedAmt * 0.2).toLocaleString()}</p>
+            <p className="text-xs mt-4 opacity-70 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Based on regional averages</p>
           </CardContent>
         </Card>
-        <Card className="rounded-3xl border-muted/50 shadow-sm">
+        <Card className="rounded-3xl border-muted/50">
           <CardContent className="pt-6">
-            <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">{t('home.flagged')}</p>
-            <p className="text-4xl font-bold mt-2 text-foreground">{stats.flaggedAmount.toLocaleString()} {language === 'pl' ? 'PLN' : 'USD'}</p>
-            <p className="text-xs mt-4 flex items-center gap-1 text-amber-600 font-medium">
-              <Info className="h-3 w-3" /> {stats.flaggedCount} {language === 'pl' ? 'wymaga uwagi' : 'need attention'}
-            </p>
+            <p className="text-sm font-medium text-muted-foreground uppercase">{t('home.flagged')}</p>
+            <p className="text-4xl font-bold mt-2">${stats.flaggedAmt.toLocaleString()}</p>
+            <p className="text-xs mt-4 text-amber-600 font-medium flex items-center gap-1"><Info className="h-3 w-3" /> {stats.flaggedCount} issues found</p>
           </CardContent>
         </Card>
-        <Card className="rounded-3xl border-muted/50 shadow-sm">
+        <Card className="rounded-3xl border-muted/50">
           <CardContent className="pt-6">
-            <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">{t('home.total')}</p>
-            <p className="text-4xl font-bold mt-2 text-foreground">{stats.totalValue.toLocaleString()} {language === 'pl' ? 'PLN' : 'USD'}</p>
-            <p className="text-xs mt-4 flex items-center gap-1 text-muted-foreground">
-              <History className="h-3 w-3" /> {language === 'pl' ? 'Ostatni:' : 'Latest:'} {audits[0]?.fileName.substring(0, 15)}...
-            </p>
+            <p className="text-sm font-medium text-muted-foreground uppercase">{t('home.total')}</p>
+            <p className="text-4xl font-bold mt-2">${stats.total.toLocaleString()}</p>
+            <p className="text-xs mt-4 text-muted-foreground flex items-center gap-1"><History className="h-3 w-3" /> Lifetime total</p>
           </CardContent>
         </Card>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <Card className="rounded-3xl border-muted/50 shadow-sm overflow-hidden">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xl">{language === 'pl' ? 'Historia Audytów' : 'Audit History'}</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[300px] pr-8">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
-                <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis fontSize={11} tickLine={false} axisLine={false} />
-                <Tooltip
-                  cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                />
-                <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        <Card className="rounded-3xl border-muted/50 shadow-sm flex flex-col justify-center items-center text-center p-10 bg-primary/5">
-          <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-            <Zap className="h-10 w-10 text-primary" />
-          </div>
-          <h3 className="text-2xl font-bold mb-3">{language === 'pl' ? 'Gotowy do dzia��ania?' : 'Ready to dispute?'}</h3>
-          <p className="text-muted-foreground mb-8 max-w-sm">
-            {language === 'pl' ? 'Skorzystaj z gotowych pism do szpitali i NFZ opartych o Twoje wyniki.' : 'Use professional templates pre-filled with findings.'}
-          </p>
-          <Button asChild className="rounded-xl w-full max-w-xs h-12 text-lg font-bold">
-            <Link to="/letters">{t('nav.letters')} <ArrowRight className="ml-2 h-5 w-5" /></Link>
-          </Button>
-        </Card>
-      </div>
+      <Card className="rounded-3xl overflow-hidden h-[350px]">
+        <CardHeader><CardTitle>Spending Trend</CardTitle></CardHeader>
+        <CardContent className="h-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
+              <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis fontSize={11} tickLine={false} axisLine={false} />
+              <Tooltip cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }} contentStyle={{ borderRadius: '12px', border: 'none' }} />
+              <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
     </div>
   );
 }

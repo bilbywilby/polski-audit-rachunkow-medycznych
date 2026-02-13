@@ -17,64 +17,53 @@ export async function extractTextFromPdf(file: File): Promise<string> {
       }
       return b.transform[5] - a.transform[5];
     });
-    const strings = sortedItems.map((item: any) => item.str);
-    fullText += strings.join(' ') + '\n';
+    fullText += sortedItems.map((item: any) => item.str).join(' ') + '\n';
   }
   return fullText;
 }
 function redactSensitiveData(text: string): string {
   let redacted = text;
   Object.values(REDACTION_PATTERNS).forEach(pattern => {
-    redacted = redacted.replace(pattern, '[ZAMASKOWANO]');
+    redacted = redacted.replace(pattern, '[REDACTED]');
   });
   return redacted;
 }
 function extractSmartData(text: string) {
-  const dateMatches = text.match(CODE_PATTERNS.date) || [];
-  const dateAltMatches = text.match(CODE_PATTERNS.dateAlt) || [];
-  const allDateMatches = [...dateMatches, ...dateAltMatches];
-  const policyMatch = text.match(CODE_PATTERNS.policy);
-  const accountMatch = text.match(CODE_PATTERNS.account);
-  const sortedDates = [...new Set(allDateMatches)].sort((a, b) => {
-    const dateA = new Date(a.split('.').reverse().join('-'));
-    const dateB = new Date(b.split('.').reverse().join('-'));
-    return dateA.getTime() - dateB.getTime();
-  });
+  const dates = text.match(CODE_PATTERNS.date) || [];
+  const policy = text.match(CODE_PATTERNS.policy);
+  const account = text.match(CODE_PATTERNS.account);
   let providerName = '';
-  const providerKeywords = ['Szpital', 'Przychodnia', 'Centrum Medyczne', 'Klinika', 'Hospital', 'Clinic', 'Specialists'];
+  const keywords = ['Hospital', 'Clinic', 'Medical Center', 'Health', 'Specialists', 'Physicians'];
   const lines = text.split('\n');
-  for (const line of lines.slice(0, 25)) {
-    if (providerKeywords.some(kw => line.toLowerCase().includes(kw.toLowerCase()))) {
+  for (const line of lines.slice(0, 15)) {
+    if (keywords.some(kw => line.includes(kw))) {
       providerName = line.trim();
       break;
     }
   }
   return {
-    providerName: providerName || 'Nie wykryto',
-    serviceDate: sortedDates[0] || '',
-    billDate: sortedDates[sortedDates.length - 1] || '',
-    policyId: policyMatch ? policyMatch[1] : '',
-    accountNumber: accountMatch ? accountMatch[1] : '',
-    allDates: sortedDates
+    providerName: providerName || 'Unknown Provider',
+    serviceDate: dates[0] || '',
+    billDate: dates[dates.length - 1] || '',
+    policyId: policy ? policy[1] : '',
+    accountNumber: account ? account[1] : ''
   };
 }
 export async function analyzeBillText(text: string, fileName: string): Promise<AuditRecord> {
   const redactedText = redactSensitiveData(text);
-  const smartData = extractSmartData(text);
-  const cptMatches = Array.from(new Set(text.match(CODE_PATTERNS.cpt) || []));
-  const icdMatches = Array.from(new Set(text.match(CODE_PATTERNS.icd10) || []));
-  const peselMatches = Array.from(new Set(text.match(CODE_PATTERNS.pesel) || []));
-  const amountsMatches = text.match(CODE_PATTERNS.amounts) || [];
-  const amounts = amountsMatches.map(m => {
-    // Standardize Polish currency (comma for decimal, remove text)
-    const sanitized = m.replace(/[PLNzł$,\s]/g, '').replace(',', '.');
-    return parseFloat(sanitized);
-  }).filter(n => !isNaN(n));
+  const smart = extractSmartData(text);
+  const cpt = Array.from(new Set(text.match(CODE_PATTERNS.cpt) || []));
+  const hcpcs = Array.from(new Set(text.match(CODE_PATTERNS.hcpcs) || []));
+  const icd = Array.from(new Set(text.match(CODE_PATTERNS.icd10) || []));
+  const rev = Array.from(new Set(text.match(CODE_PATTERNS.revenue) || []));
+  const npi = Array.from(new Set(text.match(CODE_PATTERNS.npi) || []));
+  const amountMatches = text.match(CODE_PATTERNS.amounts) || [];
+  const amounts = amountMatches.map(m => parseFloat(m.replace(/[$,\s]/g, ''))).filter(n => !isNaN(n));
   const totalAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
   const overcharges: OverchargeItem[] = [];
-  cptMatches.forEach(code => {
+  cpt.forEach(code => {
     const benchmark = PA_COST_BENCHMARKS.find(b => b.code === code);
-    if (benchmark && totalAmount > benchmark.avgCost * 1.2) {
+    if (benchmark && totalAmount > benchmark.avgCost * 1.5) {
       overcharges.push({
         code,
         description: benchmark.description,
@@ -84,14 +73,9 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
       });
     }
   });
-  const ruleCtx = { rawText: text, codes: cptMatches, overcharges };
   const flags = PA_RULES
-    .filter(rule => rule.check(ruleCtx))
-    .map(rule => ({
-      type: rule.id,
-      severity: rule.severity,
-      description: rule.description
-    }));
+    .filter(r => r.check({ rawText: text, codes: cpt, overcharges }))
+    .map(r => ({ type: r.id, severity: r.severity, description: r.description }));
   return {
     id: uuidv4(),
     date: new Date().toISOString(),
@@ -99,19 +83,14 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     rawText: text,
     redactedText,
     totalAmount,
-    detectedCpt: cptMatches,
-    detectedIcd: icdMatches,
-    detectedNpi: peselMatches,
-    extractedData: {
-      providerName: smartData.providerName,
-      dateOfService: smartData.serviceDate,
-      billDate: smartData.billDate,
-      accountNumber: smartData.accountNumber,
-      policyId: smartData.policyId,
-      allDates: smartData.allDates
-    },
+    detectedCpt: cpt,
+    detectedIcd: icd,
+    detectedHcpcs: hcpcs,
+    detectedRevenue: rev,
+    detectedNpi: npi,
+    extractedData: smart,
     overcharges,
     flags,
-    status: (flags.length > 0 || overcharges.length > 0) ? 'flagged' : 'clean'
+    status: flags.length > 0 ? 'flagged' : 'clean'
   };
 }
