@@ -4,6 +4,7 @@ export interface AuditRecord {
   date: string;
   fileName: string;
   rawText: string;
+  redactedText: string;
   totalAmount: number;
   detectedCpt: string[];
   detectedIcd: string[];
@@ -11,7 +12,7 @@ export interface AuditRecord {
   detectedRevenue?: string[];
   detectedNpi?: string[];
   flags: {
-    type: 'upcoding' | 'unbundling' | 'balance-billing' | 'clerical' | 'facility-fee';
+    type: string;
     severity: 'low' | 'medium' | 'high';
     description: string;
   }[];
@@ -19,7 +20,7 @@ export interface AuditRecord {
 }
 const DB_NAME = 'billguard-pa-db';
 const STORE_NAME = 'audits';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 let dbPromise: Promise<IDBPDatabase> | null = null;
 function getDB() {
   if (!dbPromise) {
@@ -41,7 +42,6 @@ export async function saveAudit(audit: AuditRecord): Promise<string> {
 export async function getAllAudits(): Promise<AuditRecord[]> {
   const db = await getDB();
   const audits = await db.getAll(STORE_NAME);
-  // Sort by date descending
   return audits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 export async function getAuditById(id: string): Promise<AuditRecord | undefined> {
