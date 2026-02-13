@@ -43,7 +43,7 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     flags.push({
       type: 'balance-billing',
       severity: 'high',
-      description: 'Potential No Surprises Act violation. Out-of-network keywords found with a significant balance.'
+      description: 'Potential No Surprises Act violation. Out-of-network rates detected without clear patient consent documentation.'
     });
   }
   // 2. Upcoding Check
@@ -53,25 +53,41 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     flags.push({
       type: 'upcoding',
       severity: 'medium',
-      description: `High-intensity codes found: ${foundHighRisk.join(', ')}. Ensure medical complexity justifies this coding level.`
+      description: `High-intensity codes found: ${foundHighRisk.join(', ')}. These "Level 5" codes are often used to overcharge for simple visits.`
     });
   }
-  // 3. Facility Fee / Revenue Code Analysis
-  const erRevenueCodes = ['0450', '450', '0762', '762']; // ER and Observation
+  // 3. Unbundling Detection
+  // Heuristic: Many unique CPTs (8+) OR high-level E&M found with multiple minor procedure codes
+  const minorProcedureCpts = uniqueCpt.filter(c => c.startsWith('1') || c.startsWith('2')); // General surgery/minor procedures
+  if (uniqueCpt.length >= 8) {
+    flags.push({
+      type: 'unbundling',
+      severity: 'high',
+      description: 'Significant number of procedural codes detected. Hospitals may be "unbundling" a single surgery into multiple charges.'
+    });
+  } else if (foundHighRisk.length > 0 && minorProcedureCpts.length >= 3) {
+    flags.push({
+      type: 'unbundling',
+      severity: 'medium',
+      description: 'Evaluation & Management codes found alongside multiple procedural codes. These should usually be bundled into the main charge.'
+    });
+  }
+  // 4. Facility Fee / Revenue Code Analysis
+  const erRevenueCodes = ['0450', '450', '0762', '762'];
   const foundErRevenue = uniqueRevenue.filter(code => erRevenueCodes.includes(code));
   if (foundErRevenue.length > 0 && totalAmount > 1000) {
     flags.push({
       type: 'facility-fee',
       severity: 'low',
-      description: `Emergency/Observation revenue codes detected (${foundErRevenue.join(', ')}). High bills often include separate "Facility Fees" which may be negotiable.`
+      description: `Emergency/Observation revenue codes detected. Under PA Act 32 and transparency laws, these "Facility Fees" are often negotiable or eligible for assistance.`
     });
   }
-  // 4. Clerical Check
+  // 5. Clerical Check
   if (uniqueCpt.length > 0 && uniqueIcd.length === 0) {
     flags.push({
       type: 'clerical',
       severity: 'low',
-      description: 'Procedure codes detected without matching Diagnosis codes. This often triggers claim denials.'
+      description: 'Missing diagnostic (ICD-10) links for procedures. This technical error can be used to dispute the validity of the bill.'
     });
   }
   return {

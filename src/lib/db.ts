@@ -19,10 +19,11 @@ export interface AuditRecord {
 }
 const DB_NAME = 'billguard-pa-db';
 const STORE_NAME = 'audits';
+const DB_VERSION = 3;
 let dbPromise: Promise<IDBPDatabase> | null = null;
 function getDB() {
   if (!dbPromise) {
-    dbPromise = openDB(DB_NAME, 2, {
+    dbPromise = openDB(DB_NAME, DB_VERSION, {
       upgrade(db) {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME, { keyPath: 'id' });
@@ -40,6 +41,7 @@ export async function saveAudit(audit: AuditRecord): Promise<string> {
 export async function getAllAudits(): Promise<AuditRecord[]> {
   const db = await getDB();
   const audits = await db.getAll(STORE_NAME);
+  // Sort by date descending
   return audits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 export async function getAuditById(id: string): Promise<AuditRecord | undefined> {

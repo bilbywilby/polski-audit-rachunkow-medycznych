@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LETTER_TEMPLATES } from '@/data/constants';
-import { Copy, Printer, FileText, CheckCircle } from 'lucide-react';
+import { Copy, Printer, FileText, CheckCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { AuditRecord } from '@/lib/db';
 export function LettersPage() {
@@ -21,20 +21,20 @@ export function LettersPage() {
   });
   useEffect(() => {
     if (passedAudit) {
-      // Logic to pick best template
       const hasSurprise = passedAudit.flags.some(f => f.type === 'balance-billing');
+      const hasFinancial = passedAudit.totalAmount > 5000;
       if (hasSurprise) {
         const t = LETTER_TEMPLATES.find(t => t.id === 'surprise-bill');
         if (t) setSelectedTemplate(t);
+      } else if (hasFinancial) {
+        const t = LETTER_TEMPLATES.find(t => t.id === 'financial-assistance');
+        if (t) setSelectedTemplate(t);
       }
-      // Try to extract date from raw text if possible (simple regex)
       const dateMatch = passedAudit.rawText.match(/\d{1,2}\/\d{1,2}\/\d{2,4}/);
       if (dateMatch) {
         setFormData(prev => ({ ...prev, dateOfService: dateMatch[0] }));
       }
-      toast.success('Audit data integrated', {
-        description: 'Letter fields have been pre-filled from your audit results.'
-      });
+      toast.success('Audit data integrated');
     }
   }, [passedAudit]);
   const handleCopy = () => {
@@ -45,6 +45,29 @@ export function LettersPage() {
     }
   };
   const handlePrint = () => window.print();
+  const renderContextualParagraphs = () => {
+    if (!passedAudit) return null;
+    const hasFacilityFee = passedAudit.flags.some(f => f.type === 'facility-fee');
+    const hasUnbundling = passedAudit.flags.some(f => f.type === 'unbundling');
+    return (
+      <div className="space-y-4 my-6 italic border-l-4 border-primary/20 pl-6 text-gray-700">
+        {hasFacilityFee && (
+          <p>
+            Furthermore, I am disputing the "Facility Fee" associated with this visit. Under Pennsylvania 
+            Act 32 and Hospital Transparency requirements, patients must be notified of such fees. I request 
+            that this charge be waived as it does not represent a professional medical service provided by a physician.
+          </p>
+        )}
+        {hasUnbundling && (
+          <p>
+            My audit indicates potential "unbundling" of CPT codes. Standard medical billing practices require 
+            related procedures to be grouped under a single comprehensive code. I request a review of these 
+            charges to ensure they comply with NCCI (National Correct Coding Initiative) edits.
+          </p>
+        )}
+      </div>
+    );
+  };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
@@ -54,21 +77,21 @@ export function LettersPage() {
               <h1 className="text-4xl font-display font-bold">Letter Generator</h1>
               <p className="text-lg text-muted-foreground">Professional dispute templates customized with your audit findings.</p>
               {passedAudit && (
-                <div className="flex items-center gap-2 text-green-600 bg-green-50 dark:bg-green-950/20 px-3 py-2 rounded-lg border border-green-200 inline-block">
+                <div className="flex items-center gap-2 text-primary bg-primary/5 px-3 py-2 rounded-xl border border-primary/10 inline-flex">
                   <CheckCircle className="h-4 w-4" />
-                  <span className="text-sm font-medium">Synced with Audit: {passedAudit.fileName}</span>
+                  <span className="text-sm font-medium">Linked to: {passedAudit.fileName}</span>
                 </div>
               )}
             </div>
             <div className="space-y-4">
-              <Label className="text-lg font-semibold">Select Dispute Type</Label>
+              <Label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Dispute Type</Label>
               <div className="grid grid-cols-1 gap-3">
                 {LETTER_TEMPLATES.map((t) => (
                   <button
                     key={t.id}
                     onClick={() => setSelectedTemplate(t)}
-                    className={`text-left p-5 rounded-2xl border-2 transition-all shadow-sm ${
-                      selectedTemplate.id === t.id ? 'border-primary bg-primary/5 ring-4 ring-primary/5' : 'border-border hover:border-primary/20 hover:bg-muted/30'
+                    className={`text-left p-5 rounded-2xl border-2 transition-all ${
+                      selectedTemplate.id === t.id ? 'border-primary bg-primary/5 ring-4 ring-primary/5' : 'border-border hover:border-primary/20'
                     }`}
                   >
                     <p className="font-bold text-lg">{t.name}</p>
@@ -79,106 +102,91 @@ export function LettersPage() {
             </div>
             <div className="space-y-6 border rounded-3xl p-8 bg-muted/20">
               <h3 className="text-xl font-bold flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" /> Recipient & Patient Details
+                <FileText className="h-5 w-5 text-primary" /> Details
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Patient Full Name</Label>
-                  <Input id="name" value={formData.name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="Jane Doe" className="rounded-xl" />
+                  <Label htmlFor="name">Patient Name</Label>
+                  <Input id="name" value={formData.name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="Jane Doe" className="rounded-xl h-11" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="provider">Health System / Hospital</Label>
-                  <Input id="provider" value={formData.provider} onChange={e => setFormData(prev => ({ ...prev, provider: e.target.value }))} placeholder="Main Line Health" className="rounded-xl" />
+                  <Label htmlFor="provider">Provider/Hospital</Label>
+                  <Input id="provider" value={formData.provider} onChange={e => setFormData(prev => ({ ...prev, provider: e.target.value }))} placeholder="Health System" className="rounded-xl h-11" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="acc">Account / Invoice #</Label>
-                  <Input id="acc" value={formData.accountNumber} onChange={e => setFormData(prev => ({ ...prev, accountNumber: e.target.value }))} placeholder="882104" className="rounded-xl" />
+                  <Label htmlFor="acc">Invoice #</Label>
+                  <Input id="acc" value={formData.accountNumber} onChange={e => setFormData(prev => ({ ...prev, accountNumber: e.target.value }))} placeholder="123456" className="rounded-xl h-11" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="date">Date of Service</Label>
-                  <Input id="date" value={formData.dateOfService} onChange={e => setFormData(prev => ({ ...prev, dateOfService: e.target.value }))} placeholder="MM/DD/YYYY" className="rounded-xl" />
+                  <Label htmlFor="date">Service Date</Label>
+                  <Input id="date" value={formData.dateOfService} onChange={e => setFormData(prev => ({ ...prev, dateOfService: e.target.value }))} placeholder="MM/DD/YYYY" className="rounded-xl h-11" />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="amount">Amount to Dispute ($)</Label>
-                  <Input id="amount" value={formData.amountDisputed} onChange={e => setFormData(prev => ({ ...prev, amountDisputed: e.target.value }))} placeholder="0.00" className="rounded-xl" />
+                  <Label htmlFor="amount">Disputed Amount ($)</Label>
+                  <Input id="amount" value={formData.amountDisputed} onChange={e => setFormData(prev => ({ ...prev, amountDisputed: e.target.value }))} placeholder="0.00" className="rounded-xl h-11" />
                 </div>
               </div>
             </div>
           </div>
           <div className="space-y-6">
             <div className="flex justify-between items-center no-print">
-              <h2 className="text-2xl font-bold font-display">Letter Preview</h2>
+              <h2 className="text-2xl font-bold font-display">Preview</h2>
               <div className="flex gap-2">
                 <Button variant="outline" className="rounded-xl" onClick={handleCopy}>
-                  <Copy className="h-4 w-4 mr-2" /> Copy Text
+                  <Copy className="h-4 w-4 mr-2" /> Copy
                 </Button>
-                <Button variant="default" className="rounded-xl" onClick={handlePrint}>
-                  <Printer className="h-4 w-4 mr-2" /> Print Letter
+                <Button variant="default" className="rounded-xl px-6" onClick={handlePrint}>
+                  <Printer className="h-4 w-4 mr-2" /> Print
                 </Button>
               </div>
             </div>
-            <Card className="min-h-[800px] shadow-2xl rounded-none print:shadow-none print:border-none print:m-0 print:p-0">
-              <CardContent className="p-12 md:p-16 font-serif text-[16px] leading-[1.6] text-black bg-white" id="letter-preview">
-                <div className="space-y-10">
-                  <div className="text-right">
+            <Card className="min-h-[850px] shadow-2xl rounded-none print:shadow-none print:border-none">
+              <CardContent className="p-12 md:p-16 font-serif text-[15px] leading-[1.6] text-black bg-white" id="letter-preview">
+                <div className="space-y-8">
+                  <div className="text-right text-sm">
                     <p>Date: {new Date().toLocaleDateString()}</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="font-bold uppercase tracking-wide">{formData.name || "[Patient Name]"}</p>
-                    <p>[Your Address]</p>
+                    <p className="font-bold uppercase">{formData.name || "[Patient Name]"}</p>
+                    <p>[Street Address]</p>
                     <p>[City, PA Zip Code]</p>
                   </div>
-                  <div className="space-y-1">
-                    <p>To: Billing Department</p>
+                  <div className="space-y-1 pt-4">
+                    <p>Attn: Billing Department</p>
                     <p className="font-bold">{formData.provider || "[Provider Name]"}</p>
                     <p>[Provider Address]</p>
                   </div>
-                  <div className="space-y-6">
-                    <p className="font-bold underline text-center text-lg">RE: Formal Dispute of Bill - Account #{formData.accountNumber || "[XXXX]"}</p>
+                  <div className="space-y-6 pt-6">
+                    <p className="font-bold underline text-center">RE: FORMAL DISPUTE - INVOICE #{formData.accountNumber || "[XXXX]"}</p>
                     <p>To Whom It May Concern,</p>
                     <p>
-                      I am writing to formally dispute the charges on my medical bill for services rendered on
-                      <strong> {formData.dateOfService || "[Date]"}</strong>. After conducting a thorough audit of the billed items,
-                      I have identified specific discrepancies that I believe are incorrect or violate consumer protection laws.
+                      I am writing to formally dispute charges for services rendered on 
+                      <strong> {formData.dateOfService || "[Date]"}</strong>. My personal audit of these charges 
+                      suggests significant billing errors that require immediate attention.
                     </p>
                     {selectedTemplate.id === 'general-dispute' && (
-                      <div className="space-y-4">
-                        <p>
-                          I am requesting an itemized bill that includes the specific CPT (Current Procedural Terminology) and 
-                          ICD-10 codes for every line item. I have reason to believe that the level of coding assigned 
-                          (e.g., upcoding) does not accurately reflect the medical decision-making complexity of my visit.
-                        </p>
-                        {passedAudit && passedAudit.flags.length > 0 && (
-                          <div className="pl-6 border-l-4 border-gray-200 py-2 italic text-gray-700">
-                            <strong>Audit Flag:</strong> {passedAudit.flags[0].description}
-                          </div>
-                        )}
-                      </div>
+                      <p>
+                        I request a full itemized bill with CPT and ICD-10 codes. I believe specific 
+                        coding levels do not reflect the complexity of the visit.
+                      </p>
                     )}
                     {selectedTemplate.id === 'surprise-bill' && (
-                      <div className="space-y-4">
-                        <p>
-                          This bill appears to violate the <strong>No Surprises Act</strong> and corresponding Pennsylvania 
-                          consumer protections regarding out-of-network balance billing. Under these laws, I am only 
-                          responsible for my in-network cost-sharing amounts for emergency services or services 
-                          provided at an in-network facility where I did not provide informed consent for out-of-network care.
-                        </p>
-                        <p>The disputed amount of <strong>${formData.amountDisputed || "[Amount]"}</strong> exceeds my required cost-sharing.</p>
-                      </div>
+                      <p>
+                        This bill appears to violate the <strong>No Surprises Act</strong>. As I received 
+                        emergency care, I am only responsible for my in-network cost-sharing amount. The 
+                        current balance of <strong>${formData.amountDisputed}</strong> is incorrect under federal law.
+                      </p>
                     )}
                     {selectedTemplate.id === 'financial-assistance' && (
-                      <div className="space-y-4">
-                        <p>
-                          I am requesting a formal application and evaluation for your hospital's Financial Assistance 
-                          Policy/Charity Care program (HCAP) as required by Pennsylvania and Federal guidelines. 
-                          I believe I meet the eligibility criteria for a significant reduction or waiver of these charges.
-                        </p>
-                      </div>
+                      <p>
+                        I am requesting an application for Financial Assistance (Charity Care) as per 
+                        hospital policy and Pennsylvania state guidelines.
+                      </p>
                     )}
+                    {renderContextualParagraphs()}
                     <p>
-                      Please investigate this matter and provide a written response within thirty (30) days. Until this 
-                      matter is resolved, I request that this account be placed in "disputed" status and not be 
-                      referred to any third-party collection agency or reported to credit bureaus.
+                      Please place this account in "disputed" status. Do not refer this to collections 
+                      while this investigation is pending. I look forward to your written response within 30 days.
                     </p>
                     <div className="pt-12">
                       <p>Sincerely,</p>

@@ -13,7 +13,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { DashboardPage } from '@/pages/DashboardPage';
+import { HomePage } from '@/pages/HomePage';
 import { GlossaryPage } from '@/pages/GlossaryPage';
 import { ResourcesPage } from '@/pages/ResourcesPage';
 import { AuditStudioPage } from '@/pages/AuditStudioPage';
@@ -27,7 +27,7 @@ const router = createBrowserRouter([
     element: <MainLayout />,
     errorElement: <RouteErrorBoundary />,
     children: [
-      { index: true, element: <DashboardPage /> },
+      { index: true, element: <HomePage /> },
       { path: "audit", element: <AuditStudioPage /> },
       { path: "audit/:id", element: <AuditDetailsPage /> },
       { path: "glossary", element: <GlossaryPage /> },
