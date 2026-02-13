@@ -16,13 +16,9 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { GlossaryPage } from '@/pages/GlossaryPage';
 import { ResourcesPage } from '@/pages/ResourcesPage';
-// Placeholder pages for next phase
-const PlaceholderPage = ({ title }: { title: string }) => (
-  <div className="p-12 text-center text-muted-foreground">
-    <h2 className="text-2xl font-bold text-foreground mb-4">{title}</h2>
-    Coming soon in Phase 2.
-  </div>
-);
+import { AuditStudioPage } from '@/pages/AuditStudioPage';
+import { HistoryPage } from '@/pages/HistoryPage';
+import { LettersPage } from '@/pages/LettersPage';
 const queryClient = new QueryClient();
 const router = createBrowserRouter([
   {
@@ -31,11 +27,11 @@ const router = createBrowserRouter([
     errorElement: <RouteErrorBoundary />,
     children: [
       { index: true, element: <DashboardPage /> },
-      { path: "audit", element: <PlaceholderPage title="Audit Studio" /> },
+      { path: "audit", element: <AuditStudioPage /> },
       { path: "glossary", element: <GlossaryPage /> },
       { path: "resources", element: <ResourcesPage /> },
-      { path: "history", element: <PlaceholderPage title="Audit History" /> },
-      { path: "letters", element: <PlaceholderPage title="Letter Generator" /> },
+      { path: "history", element: <HistoryPage /> },
+      { path: "letters", element: <LettersPage /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
