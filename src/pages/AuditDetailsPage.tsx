@@ -5,15 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  ArrowLeft, 
-  AlertTriangle, 
-  FileText, 
-  Trash2, 
-  ArrowRight, 
-  ClipboardCheck, 
+import {
+  ArrowLeft,
+  AlertTriangle,
+  FileText,
+  Trash2,
+  ArrowRight,
+  ClipboardCheck,
   SearchCode,
-  Calendar
+  Calendar,
+  Info
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -92,32 +93,42 @@ export function AuditDetailsPage() {
                   <CardHeader>
                     <CardTitle className="text-2xl flex items-center gap-2">
                       <ClipboardCheck className="h-6 w-6 text-primary" />
-                      Detected Codes
+                      Detected Medical Codes
                     </CardTitle>
-                    <CardDescription>All CPT and ICD-10 codes found in your bill data.</CardDescription>
+                    <CardDescription>Comprehensive identification of billing codes found in the document.</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-8">
-                    <div className="space-y-4">
-                      <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Procedure Codes (CPT)</p>
-                      <div className="flex flex-wrap gap-3">
-                        {audit.detectedCpt.map(code => (
-                          <Badge key={code} variant="secondary" className="px-4 py-1.5 text-base bg-blue-50 text-blue-700 border-none hover:bg-blue-100">
-                            {code}
-                          </Badge>
-                        ))}
-                        {audit.detectedCpt.length === 0 && <p className="text-muted-foreground italic">No CPT codes identified.</p>}
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-3">
+                        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Procedures (CPT)</p>
+                        <div className="flex flex-wrap gap-2">
+                          {audit.detectedCpt.map(code => <Badge key={code} variant="secondary" className="bg-blue-50 text-blue-700">{code}</Badge>)}
+                          {audit.detectedCpt.length === 0 && <p className="text-sm italic text-muted-foreground">None</p>}
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-4">
-                      <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Diagnosis Codes (ICD-10)</p>
-                      <div className="flex flex-wrap gap-3">
-                        {audit.detectedIcd.map(code => (
-                          <Badge key={code} variant="outline" className="px-4 py-1.5 text-base border-primary/20">
-                            {code}
-                          </Badge>
-                        ))}
-                        {audit.detectedIcd.length === 0 && <p className="text-muted-foreground italic">No ICD-10 codes identified.</p>}
+                      <div className="space-y-3">
+                        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Diagnoses (ICD-10)</p>
+                        <div className="flex flex-wrap gap-2">
+                          {audit.detectedIcd.map(code => <Badge key={code} variant="outline" className="border-primary/20">{code}</Badge>)}
+                          {audit.detectedIcd.length === 0 && <p className="text-sm italic text-muted-foreground">None</p>}
+                        </div>
                       </div>
+                      {audit.detectedHcpcs && audit.detectedHcpcs.length > 0 && (
+                        <div className="space-y-3">
+                          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Supplies (HCPCS)</p>
+                          <div className="flex flex-wrap gap-2">
+                            {audit.detectedHcpcs.map(code => <Badge key={code} variant="secondary" className="bg-indigo-50 text-indigo-700">{code}</Badge>)}
+                          </div>
+                        </div>
+                      )}
+                      {audit.detectedRevenue && audit.detectedRevenue.length > 0 && (
+                        <div className="space-y-3">
+                          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Revenue Codes</p>
+                          <div className="flex flex-wrap gap-2">
+                            {audit.detectedRevenue.map(code => <Badge key={code} variant="secondary" className="bg-orange-50 text-orange-700">{code}</Badge>)}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -125,19 +136,23 @@ export function AuditDetailsPage() {
                   <CardHeader>
                     <CardTitle className="text-2xl flex items-center gap-2">
                       <SearchCode className="h-6 w-6 text-primary" />
-                      Financial Summary
+                      Facility & Provider Data
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex flex-col sm:flex-row gap-8">
+                    <div className="flex flex-col sm:flex-row gap-6">
                       <div className="flex-1 p-6 bg-muted/40 rounded-2xl">
-                        <p className="text-sm font-medium text-muted-foreground">Detected Total</p>
+                        <p className="text-sm font-medium text-muted-foreground">Total Detected Amount</p>
                         <p className="text-4xl font-bold mt-1">${audit.totalAmount.toLocaleString()}</p>
                       </div>
-                      <div className="flex-1 p-6 bg-primary/5 rounded-2xl border border-primary/10">
-                        <p className="text-sm font-medium text-primary">Disputable Issues</p>
-                        <p className="text-4xl font-bold mt-1 text-primary">{audit.flags.length}</p>
-                      </div>
+                      {audit.detectedNpi && audit.detectedNpi.length > 0 && (
+                        <div className="flex-1 p-6 bg-primary/5 rounded-2xl border border-primary/10">
+                          <p className="text-sm font-medium text-primary">Detected NPIs</p>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {audit.detectedNpi.map(npi => <Badge key={npi} className="bg-primary text-primary-foreground">{npi}</Badge>)}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -146,7 +161,7 @@ export function AuditDetailsPage() {
                 <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900 border-2 rounded-3xl">
                   <CardHeader>
                     <CardTitle className="text-amber-800 dark:text-amber-400 flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5" /> Audit Flags
+                      <AlertTriangle className="h-5 w-5" /> Audit Findings
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-5">
@@ -154,10 +169,10 @@ export function AuditDetailsPage() {
                       audit.flags.map((flag, idx) => (
                         <div key={idx} className="p-4 rounded-2xl bg-white/60 dark:bg-black/20 border border-amber-200/50 shadow-sm">
                           <div className="flex justify-between items-center mb-2">
-                            <p className="font-bold text-amber-900 dark:text-amber-300 text-sm tracking-wide">
-                              {flag.type.replace('-', ' ').toUpperCase()}
+                            <p className="font-bold text-amber-900 dark:text-amber-300 text-xs uppercase tracking-tighter">
+                              {flag.type.replace('-', ' ')}
                             </p>
-                            <Badge className={flag.severity === 'high' ? 'bg-red-500' : 'bg-amber-600'}>
+                            <Badge variant="outline" className={flag.severity === 'high' ? 'border-red-500 text-red-600' : 'border-amber-600 text-amber-700'}>
                               {flag.severity}
                             </Badge>
                           </div>
@@ -167,14 +182,20 @@ export function AuditDetailsPage() {
                         </div>
                       ))
                     ) : (
-                      <div className="text-center py-10">
-                        <Badge className="bg-green-500 mb-4 h-12 w-12 rounded-full flex items-center justify-center">
-                          <ClipboardCheck className="h-6 w-6" />
-                        </Badge>
-                        <p className="font-bold text-green-700">Clean Report</p>
-                        <p className="text-sm text-green-600/80">Our engine didn't find any obvious errors in this bill.</p>
+                      <div className="text-center py-10 space-y-2">
+                        <ClipboardCheck className="h-10 w-10 text-green-500 mx-auto" />
+                        <p className="font-bold text-green-700">No Issues Found</p>
+                        <p className="text-xs text-green-600/70 italic">Standard heuristic checks passed.</p>
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+                <Card className="rounded-3xl bg-primary text-primary-foreground p-1 overflow-hidden">
+                  <CardContent className="p-6">
+                    <h4 className="font-bold mb-2 flex items-center gap-2"><Info className="h-4 w-4" /> Pro Tip</h4>
+                    <p className="text-sm opacity-90 leading-relaxed">
+                      Revenue codes like <strong>0450</strong> indicate Emergency Room services. Always check if you were billed an "ER Room Charge" separate from the doctor's visit.
+                    </p>
                   </CardContent>
                 </Card>
               </div>
@@ -184,13 +205,13 @@ export function AuditDetailsPage() {
             <Card className="rounded-3xl border-muted/50 overflow-hidden">
               <CardHeader className="bg-muted/30">
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" /> Extracted Text Data
+                  <FileText className="h-5 w-5 text-primary" /> Extracted Document Text
                 </CardTitle>
-                <CardDescription>The raw data our engine analyzed from your document.</CardDescription>
+                <CardDescription>Processed raw text data from your document for audit verification.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <pre className="p-8 text-sm font-mono whitespace-pre-wrap leading-relaxed max-h-[600px] overflow-y-auto bg-muted/10">
-                  {audit.rawText || "No raw text available for this record."}
+                <pre className="p-8 text-[13px] font-mono whitespace-pre-wrap leading-relaxed max-h-[600px] overflow-y-auto bg-muted/10">
+                  {audit.rawText || "No text extracted."}
                 </pre>
               </CardContent>
             </Card>

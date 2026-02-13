@@ -1,16 +1,17 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { FileUp, FileText, Loader2, CheckCircle2, AlertTriangle, ArrowRight, Activity, ClipboardList } from 'lucide-react';
+import { FileUp, FileText, Loader2, CheckCircle2, AlertTriangle, ArrowRight, Activity, ClipboardList, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { extractTextFromPdf, analyzeBillText } from '@/lib/audit-engine';
 import { saveAudit, AuditRecord } from '@/lib/db';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 type Step = 'upload' | 'analyzing' | 'results';
 export function AuditStudioPage() {
   const navigate = useNavigate();
@@ -126,7 +127,7 @@ export function AuditStudioPage() {
               </div>
               <div className="text-center space-y-4 w-full max-w-md">
                 <h2 className="text-3xl font-bold">Auditing Records...</h2>
-                <p className="text-muted-foreground italic">Your data is safe. We are scanning for CPT upcoding, unbundling, and PA-specific billing protections.</p>
+                <p className="text-muted-foreground italic">Your data is safe. We are scanning for CPT, HCPCS, and Revenue codes along with PA-specific protections.</p>
                 <Progress value={progress} className="h-2" />
               </div>
             </motion.div>
@@ -171,28 +172,42 @@ export function AuditStudioPage() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                      <div className="space-y-3">
-                        <p className="text-sm font-medium text-muted-foreground uppercase">Procedures (CPT)</p>
-                        <div className="flex flex-wrap gap-2">
-                          {result.detectedCpt.map(code => (
-                            <Badge key={code} variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none px-3 py-1">
-                              {code}
-                            </Badge>
-                          ))}
-                          {result.detectedCpt.length === 0 && <span className="text-sm italic">None detected</span>}
+                      <TooltipProvider>
+                        <div className="space-y-4">
+                          <div className="space-y-3">
+                            <p className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
+                              Procedures (CPT)
+                              <Tooltip><TooltipTrigger><Info className="h-3 w-3" /></TooltipTrigger><TooltipContent>Standard codes for services and procedures.</TooltipContent></Tooltip>
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {result.detectedCpt.map(code => <Badge key={code} variant="secondary" className="bg-blue-100 text-blue-700">{code}</Badge>)}
+                              {result.detectedCpt.length === 0 && <span className="text-sm italic">None</span>}
+                            </div>
+                          </div>
+                          {(result.detectedHcpcs?.length ?? 0) > 0 && (
+                            <div className="space-y-3">
+                              <p className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
+                                Supplies (HCPCS)
+                                <Tooltip><TooltipTrigger><Info className="h-3 w-3" /></TooltipTrigger><TooltipContent>Codes for medical equipment, supplies, and medications.</TooltipContent></Tooltip>
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {result.detectedHcpcs?.map(code => <Badge key={code} variant="secondary" className="bg-indigo-100 text-indigo-700">{code}</Badge>)}
+                              </div>
+                            </div>
+                          )}
+                          {(result.detectedRevenue?.length ?? 0) > 0 && (
+                            <div className="space-y-3">
+                              <p className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
+                                Revenue Codes
+                                <Tooltip><TooltipTrigger><Info className="h-3 w-3" /></TooltipTrigger><TooltipContent>Identifies the hospital department where service was provided.</TooltipContent></Tooltip>
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {result.detectedRevenue?.map(code => <Badge key={code} variant="secondary" className="bg-orange-100 text-orange-700">{code}</Badge>)}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                      <div className="space-y-3">
-                        <p className="text-sm font-medium text-muted-foreground uppercase">Diagnoses (ICD-10)</p>
-                        <div className="flex flex-wrap gap-2">
-                          {result.detectedIcd.map(code => (
-                            <Badge key={code} variant="outline" className="border-primary/20 px-3 py-1">
-                              {code}
-                            </Badge>
-                          ))}
-                          {result.detectedIcd.length === 0 && <span className="text-sm italic">None detected</span>}
-                        </div>
-                      </div>
+                      </TooltipProvider>
                     </CardContent>
                   </Card>
                 </div>
@@ -227,7 +242,7 @@ export function AuditStudioPage() {
                         <div className="text-center py-6">
                           <CheckCircle2 className="h-10 w-10 text-green-500 mx-auto mb-2" />
                           <p className="font-bold text-green-700">Audit Passed</p>
-                          <p className="text-sm text-green-600">No red flags found.</p>
+                          <p className="text-sm text-green-600">No major red flags found.</p>
                         </div>
                       )}
                     </CardContent>

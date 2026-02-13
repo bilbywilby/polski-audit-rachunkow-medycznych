@@ -7,8 +7,11 @@ export interface AuditRecord {
   totalAmount: number;
   detectedCpt: string[];
   detectedIcd: string[];
+  detectedHcpcs?: string[];
+  detectedRevenue?: string[];
+  detectedNpi?: string[];
   flags: {
-    type: 'upcoding' | 'unbundling' | 'balance-billing' | 'clerical';
+    type: 'upcoding' | 'unbundling' | 'balance-billing' | 'clerical' | 'facility-fee';
     severity: 'low' | 'medium' | 'high';
     description: string;
   }[];
@@ -19,7 +22,7 @@ const STORE_NAME = 'audits';
 let dbPromise: Promise<IDBPDatabase> | null = null;
 function getDB() {
   if (!dbPromise) {
-    dbPromise = openDB(DB_NAME, 1, {
+    dbPromise = openDB(DB_NAME, 2, {
       upgrade(db) {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME, { keyPath: 'id' });
