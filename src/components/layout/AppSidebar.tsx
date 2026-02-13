@@ -1,14 +1,12 @@
 import React from "react";
-import {
-  Shield,
-  FileText,
-  BookOpen,
-  Landmark,
-  History,
+import { 
+  Shield, 
+  FileText, 
+  BookOpen, 
+  Landmark, 
+  History, 
   LayoutDashboard,
-  Search,
-  Languages,
-  TrendingUp
+  Search
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -22,21 +20,18 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
 } from "@/components/ui/sidebar";
-import { useLanguage } from "@/hooks/use-language";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 export function AppSidebar(): JSX.Element {
   const location = useLocation();
-  const { language, toggleLanguage, t } = useLanguage();
   const menuItems = [
-    { title: t('nav.dashboard'), icon: LayoutDashboard, url: "/" },
-    { title: t('nav.audit'), icon: Search, url: "/audit" },
-    { title: t('nav.insurancerates'), icon: TrendingUp, url: "/insurance-audit" },
-    { title: t('nav.history'), icon: History, url: "/history" },
+    { title: "Dashboard", icon: LayoutDashboard, url: "/" },
+    { title: "Audit Studio", icon: Search, url: "/audit" },
+    { title: "History", icon: History, url: "/history" },
   ];
   const knowledgeItems = [
-    { title: t('nav.glossary'), icon: BookOpen, url: "/glossary" },
-    { title: t('nav.resources'), icon: Landmark, url: "/resources" },
-    { title: t('nav.letters'), icon: FileText, url: "/letters" },
+    { title: "Glossary", icon: BookOpen, url: "/glossary" },
+    { title: "PA Resources", icon: Landmark, url: "/resources" },
+    { title: "Letter Generator", icon: FileText, url: "/letters" },
   ];
   return (
     <Sidebar variant="floating" collapsible="icon">
@@ -50,12 +45,12 @@ export function AppSidebar(): JSX.Element {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>{language === 'pl' ? 'Nawigacja' : 'Navigation'}</SidebarGroupLabel>
+          <SidebarGroupLabel>Main Navigation</SidebarGroupLabel>
           <SidebarMenu>
             {menuItems.map((item) => (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton
-                  asChild
+                <SidebarMenuButton 
+                  asChild 
                   isActive={location.pathname === item.url}
                   tooltip={item.title}
                 >
@@ -69,12 +64,12 @@ export function AppSidebar(): JSX.Element {
           </SidebarMenu>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>{language === 'pl' ? 'Wiedza i Narzędzia' : 'Knowledge & Tools'}</SidebarGroupLabel>
+          <SidebarGroupLabel>Knowledge & Tools</SidebarGroupLabel>
           <SidebarMenu>
             {knowledgeItems.map((item) => (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton
-                  asChild
+                <SidebarMenuButton 
+                  asChild 
                   isActive={location.pathname === item.url}
                   tooltip={item.title}
                 >
@@ -89,19 +84,10 @@ export function AppSidebar(): JSX.Element {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className="p-4 space-y-4">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-start gap-2 h-9 text-xs"
-            onClick={toggleLanguage}
-          >
-            <Languages className="h-4 w-4" />
-            {language === 'pl' ? 'English (US)' : 'Przeł��cz na Polski'}
-          </Button>
-          <div className="rounded-lg bg-muted p-3 text-[10px] text-muted-foreground border border-border">
-            <p className="font-bold text-foreground mb-1 uppercase tracking-wider">Local-First / HIPAA</p>
-            {language === 'pl' ? 'Dane nie opuszczają przeglądarki.' : 'Your data stays on this device.'}
+        <div className="p-4">
+          <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground border border-border">
+            <p className="font-medium text-foreground mb-1">Privacy Focused</p>
+            Audit data is processed locally in your browser.
           </div>
         </div>
       </SidebarFooter>
