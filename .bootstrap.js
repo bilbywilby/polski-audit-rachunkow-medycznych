@@ -77,7 +77,11 @@ function updateWranglerJsonc() {
 }
 
 function runSetupCommands() {
-    const commands = [];
+    const commands = [
+    "bun add react-dropzone@^14.2.3",
+    "bun add pdfjs-dist@^4.7.432",
+    "bun add idb@^8.0.0"
+];
     
     if (commands.length === 0) {
         console.log('⊘ No setup commands to run');
