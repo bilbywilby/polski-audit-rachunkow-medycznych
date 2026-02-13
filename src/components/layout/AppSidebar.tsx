@@ -43,7 +43,7 @@ export function AppSidebar(): JSX.Element {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg">
             <Shield className="h-5 w-5" />
           </div>
-          <span className="text-lg font-bold tracking-tight truncate">BillGuard PL</span>
+          <span className="text-lg font-bold tracking-tight truncate">BillGuard PA</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -67,7 +67,7 @@ export function AppSidebar(): JSX.Element {
           </SidebarMenu>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>{language === 'pl' ? 'Wiedza i Narzędzia' : 'Knowledge'}</SidebarGroupLabel>
+          <SidebarGroupLabel>{language === 'pl' ? 'Wiedza i Narzędzia' : 'Knowledge & Tools'}</SidebarGroupLabel>
           <SidebarMenu>
             {knowledgeItems.map((item) => (
               <SidebarMenuItem key={item.title}>
@@ -88,18 +88,18 @@ export function AppSidebar(): JSX.Element {
       </SidebarContent>
       <SidebarFooter>
         <div className="p-4 space-y-4">
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             className="w-full justify-start gap-2 h-9 text-xs"
             onClick={toggleLanguage}
           >
             <Languages className="h-4 w-4" />
-            {language === 'pl' ? 'English Version' : 'Polska Wersja'}
+            {language === 'pl' ? 'English (US)' : 'Przełącz na Polski'}
           </Button>
           <div className="rounded-lg bg-muted p-3 text-[10px] text-muted-foreground border border-border">
-            <p className="font-bold text-foreground mb-1">Local-First / RODO</p>
-            {language === 'pl' ? 'Dane nie opuszczają przeglądarki.' : 'Data stays in your browser.'}
+            <p className="font-bold text-foreground mb-1 uppercase tracking-wider">Local-First / HIPAA</p>
+            {language === 'pl' ? 'Dane nie opuszczają przeglądarki.' : 'Your data stays on this device.'}
           </div>
         </div>
       </SidebarFooter>

@@ -38,23 +38,26 @@ export function MainLayout(): JSX.Element {
             <Outlet />
           </div>
         </main>
-        <footer className="border-t bg-muted/30 py-10">
+        <footer className="border-t bg-muted/30 py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
-            <div className="space-y-2">
+            <div className="space-y-3">
               <p className="text-sm font-bold text-foreground flex items-center justify-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-blue-600" /> HIPAA-Friendly Processing
+                <ShieldCheck className="h-5 w-5 text-blue-600" /> HIPAA-Friendly Privacy Model
               </p>
-              <p className="text-xs text-muted-foreground italic max-w-3xl mx-auto leading-relaxed">
-                {t('footer.rodo')}
+              <p className="text-xs text-muted-foreground italic max-w-2xl mx-auto leading-relaxed">
+                {t('footer.privacy')}
               </p>
             </div>
-            <div className="flex justify-center items-center gap-4 text-[10px] text-muted-foreground uppercase font-bold tracking-widest opacity-40">
-              <span>PA Act 102 Compliant</span>
+            <div className="flex justify-center flex-wrap items-center gap-4 text-[10px] text-muted-foreground uppercase font-bold tracking-widest opacity-60">
+              <span className="bg-muted px-2 py-1 rounded border">PA Act 102 Compliant</span>
               <span>•</span>
-              <span>No Surprises Act Engine</span>
+              <span className="bg-muted px-2 py-1 rounded border">No Surprises Act Ready</span>
               <span>•</span>
-              <span>100% Local-First Analysis</span>
+              <span className="bg-muted px-2 py-1 rounded border">100% Local-First Audit</span>
             </div>
+            <p className="text-[10px] text-muted-foreground/40 max-w-md mx-auto">
+              Disclaimer: BillGuard PA is a diagnostic tool and does not constitute legal or financial advice.
+            </p>
           </div>
         </footer>
         <Toaster richColors closeButton />

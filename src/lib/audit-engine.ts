@@ -43,10 +43,11 @@ function extractSmartData(text: string) {
   }
   return {
     providerName: providerName || 'Unknown Provider',
-    serviceDate: dates[0] || '',
+    dateOfService: dates[0] || '', // Changed from serviceDate to dateOfService
     billDate: dates[dates.length - 1] || '',
     policyId: policy ? policy[1] : '',
-    accountNumber: account ? account[1] : ''
+    accountNumber: account ? account[1] : '',
+    allDates: dates
   };
 }
 export async function analyzeBillText(text: string, fileName: string): Promise<AuditRecord> {
@@ -88,7 +89,14 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     detectedHcpcs: hcpcs,
     detectedRevenue: rev,
     detectedNpi: npi,
-    extractedData: smart,
+    extractedData: {
+      providerName: smart.providerName,
+      dateOfService: smart.dateOfService,
+      billDate: smart.billDate,
+      accountNumber: smart.accountNumber,
+      policyId: smart.policyId,
+      allDates: smart.allDates
+    },
     overcharges,
     flags,
     status: flags.length > 0 ? 'flagged' : 'clean'
