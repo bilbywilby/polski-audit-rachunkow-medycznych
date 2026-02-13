@@ -32,6 +32,7 @@ export interface AuditRecord {
   detectedNpi?: string[];
   planType: 'COMMERCIAL' | 'MEDICAID' | 'MEDICARE' | 'UNKNOWN';
   zipCode?: string;
+  fingerprint?: string;
   extractedData: {
     providerName?: string;
     dateOfService?: string;
@@ -95,7 +96,6 @@ function getDB() {
   }
   return dbPromise;
 }
-// Audit Records
 export async function saveAudit(audit: AuditRecord): Promise<string> {
   const db = await getDB();
   await db.put(STORE_NAME, audit);
@@ -109,6 +109,11 @@ export async function getAuditById(id: string): Promise<AuditRecord | undefined>
   const db = await getDB();
   return db.get(STORE_NAME, id);
 }
+export async function findAuditByFingerprint(hash: string): Promise<AuditRecord | undefined> {
+  const db = await getDB();
+  const all = await db.getAll(STORE_NAME);
+  return all.find(a => a.fingerprint === hash);
+}
 export async function deleteAudit(id: string): Promise<void> {
   const db = await getDB();
   const tx = db.transaction([STORE_NAME, REDACTION_STORE], 'readwrite');
@@ -121,7 +126,6 @@ export async function deleteAudit(id: string): Promise<void> {
   }
   await tx.done;
 }
-// Insurance Filings
 export async function saveFiling(filing: InsuranceFilingRecord): Promise<string> {
   const db = await getDB();
   await db.put(FILINGS_STORE, filing);
@@ -139,7 +143,6 @@ export async function deleteFiling(id: string): Promise<void> {
   const db = await getDB();
   await db.delete(FILINGS_STORE, id);
 }
-// Global Actions
 export async function saveRedactionAudit(record: RedactionAuditRecord): Promise<void> {
   const db = await getDB();
   await db.put(REDACTION_STORE, record);

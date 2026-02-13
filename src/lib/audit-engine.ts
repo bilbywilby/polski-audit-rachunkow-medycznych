@@ -1,25 +1,50 @@
 import * as pdfjs from 'pdfjs-dist';
-import { CODE_PATTERNS, REDACTION_PATTERNS, PA_RULES, FAIR_BENCHMARKS, PLAN_KEYWORDS, PA_VIOLATION_TAXONOMY } from '@/data/constants';
+import { 
+  CODE_PATTERNS, 
+  REDACTION_PATTERNS, 
+  PA_RULES, 
+  FAIR_BENCHMARKS, 
+  PLAN_KEYWORDS, 
+  PA_VIOLATION_TAXONOMY,
+  MAX_PAGE_COUNT,
+  RuleContext
+} from '@/data/constants';
 import { AuditRecord, OverchargeItem, saveRedactionAudit } from './db';
 import { v4 as uuidv4 } from 'uuid';
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+export async function generateDocumentFingerprint(text: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(text.substring(0, 10000));
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 export async function extractTextFromPdf(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-  let fullText = '';
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const items = content.items as any[];
-    const sortedItems = items.sort((a, b) => {
-      if (Math.abs(a.transform[5] - b.transform[5]) < 5) {
-        return a.transform[4] - b.transform[4];
-      }
-      return b.transform[5] - a.transform[5];
-    });
-    fullText += sortedItems.map((item: any) => item.str).join(' ') + '\n';
-  }
-  return fullText;
+  const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+  const timeoutPromise = new Promise<never>((_, reject) => 
+    setTimeout(() => reject(new Error('PDF Extraction Timeout (30s)')), 30000)
+  );
+  const extractionPromise = (async () => {
+    const pdf = await loadingTask.promise;
+    if (pdf.numPages > MAX_PAGE_COUNT) {
+      throw new Error(`File too large: ${pdf.numPages} pages exceeds ${MAX_PAGE_COUNT} page limit.`);
+    }
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const items = content.items as any[];
+      const sortedItems = items.sort((a, b) => {
+        if (Math.abs(a.transform[5] - b.transform[5]) < 5) {
+          return a.transform[4] - b.transform[4];
+        }
+        return b.transform[5] - a.transform[5];
+      });
+      fullText += sortedItems.map((item: any) => item.str).join(' ') + '\n';
+    }
+    return fullText;
+  })();
+  return Promise.race([extractionPromise, timeoutPromise]);
 }
 function redactSensitiveData(text: string): { redacted: string; count: number } {
   let redacted = text;
@@ -45,14 +70,14 @@ function detectPlanType(text: string): 'COMMERCIAL' | 'MEDICAID' | 'MEDICARE' | 
   return 'UNKNOWN';
 }
 export async function analyzeBillText(text: string, fileName: string): Promise<AuditRecord> {
-  const { redacted, count } = redactSensitiveData(text);
+  const { redacted, count: redactionCount } = redactSensitiveData(text);
   const planType = detectPlanType(text);
   const zipMatches = text.match(CODE_PATTERNS.zip);
   const zipCode = zipMatches ? zipMatches[0] : undefined;
+  const fingerprint = await generateDocumentFingerprint(text);
   const cpt = Array.from(new Set(text.match(CODE_PATTERNS.cpt) || []));
   const hcpcs = Array.from(new Set(text.match(CODE_PATTERNS.hcpcs) || []));
   const revenue = Array.from(new Set(text.match(CODE_PATTERNS.revenue) || []));
-  // Improved amount extraction: proximity-to-currency and range validation
   const amountRegex = /\$\s?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g;
   let match;
   const amounts: number[] = [];
@@ -76,7 +101,8 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
       });
     }
   });
-  const rawFlags = PA_RULES.filter(r => r.check({ rawText: text, overcharges, cpt }));
+  const ruleCtx: RuleContext = { rawText: text, overcharges, cpt, planType };
+  const rawFlags = PA_RULES.filter(r => r.check(ruleCtx));
   const flags = await Promise.all(rawFlags.map(async f => {
     const snippet = text.substring(0, 200).replace(/\n/g, ' ');
     const hash = await computeEvidenceHash(snippet);
@@ -97,7 +123,6 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
   const dates = text.match(CODE_PATTERNS.date) || [];
   const policy = text.match(CODE_PATTERNS.policy);
   const account = text.match(CODE_PATTERNS.account);
-  // Enhanced Bill Date Heuristics
   let billDate = dates[0] || '';
   const dateKeywords = ['BILL DATE', 'STATEMENT DATE', 'INVOICE DATE', 'ISSUED'];
   for (const kw of dateKeywords) {
@@ -111,10 +136,9 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
       }
     }
   }
-  // Enhanced Provider Name Detection (Filtering junk headers)
-  const headerLines = text.split('\n').slice(0, 10).map(l => l.trim()).filter(l => l.length > 4);
-  const junkTerms = ['PAGE', 'CONFIDENTIAL', 'ACCOUNT', 'DATE', 'STATEMENT', 'PATIENT'];
-  const providerName = headerLines.find(l => !junkTerms.some(jt => l.toUpperCase().includes(jt))) || 'Unknown Facility';
+  const headerLines = text.split('\n').slice(0, 15).map(l => l.trim()).filter(l => l.length > 5);
+  const providerKeywords = ['HOSPITAL', 'CLINIC', 'CENTER', 'HEALTH', 'MEDICAL'];
+  const providerName = headerLines.find(l => providerKeywords.some(kw => l.toUpperCase().includes(kw))) || headerLines[0] || 'Unknown Facility';
   return {
     id: auditId,
     date: new Date().toISOString(),
@@ -128,6 +152,7 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     detectedRevenue: revenue,
     planType,
     zipCode,
+    fingerprint,
     extractedData: {
       providerName,
       dateOfService: dates[dates.length - 1] || dates[0] || '',

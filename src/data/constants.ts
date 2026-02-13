@@ -1,4 +1,12 @@
 export type Language = 'en' | 'pl';
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+export const MAX_PAGE_COUNT = 50;
+export interface RuleContext {
+  rawText: string;
+  overcharges: any[];
+  cpt: string[];
+  planType: string;
+}
 export const GLOSSARY_TERMS: Record<Language, { term: string; definition: string }[]> = {
   en: [
     { term: "Adjustment", definition: "The difference between the provider's charge and the allowed amount, usually written off by the provider." },
@@ -14,7 +22,7 @@ export const GLOSSARY_TERMS: Record<Language, { term: string; definition: string
     { term: "Kwota Dopuszczalna", definition: "Maksymalna kwota, jaką plan zapłaci za objętą usługę opieki zdrowotnej." },
     { term: "Balance Billing", definition: "Gdy dostawca wystawia rachunek na różnicę między jego opłatą a kwotą dopuszczalną. Często zabronione przez No Surprises Act." },
     { term: "Kod CPT", definition: "Current Procedural Terminology. 5-cyfrowy kod używany do opisu usług medycznych i diagnostycznych." },
-    { term: "Wyjaśnienie Świadczeń (EOB)", definition: "Oświadczenie od ubezpieczyciela wyjaśniające, co zosta��o objęte ubezpieczeniem i ile jesteś winien." },
+    { term: "Wyja��nienie Świadczeń (EOB)", definition: "Oświadczenie od ubezpieczyciela wyjaśniające, co zostało objęte ubezpieczeniem i ile jesteś winien." },
     { term: "No Surprises Act", definition: "Federalna ustawa chroniąca pacjentów przed nieoczekiwanymi rachunkami medycznymi za usługi ratunkowe." },
     { term: "Ustawa 102 (PA)", definition: "Prawo Pensylwanii wymagające od szpitali dostarczenia szczegółowego rachunku w ciągu 30 dni od żądania." }
   ]
@@ -70,6 +78,9 @@ export const PLAN_KEYWORDS = {
 export const PA_VIOLATION_TAXONOMY: Record<string, string> = {
   'balance-billing': 'No Surprises Act - 42 U.S.C. § 300gg-111',
   'act-102-triad': 'PA Act 102 § 3 (Right to Itemized Bill / Emergency Protections)',
+  'act-102-billing-error': 'PA Act 102 § 5 (Accuracy Standards)',
+  'act-102-itemization-fail': 'PA Act 102 § 3 (Itemized Statement Requirement)',
+  'act-102-emergency-protect': 'PA Act 102 § 7 (Emergency Care Limitations)',
   'fair-market-overcharge': 'Pennsylvania Unfair Trade Practices and Consumer Protection Law (UTPCPL)',
   'upcoding-detected': 'PA Act 102 Quality Standards',
   'unbundling-detected': 'PA Act 102 Quality Standards / CCI Edits',
@@ -90,20 +101,27 @@ export const PA_RULES = [
     name: 'Potential Balance Billing',
     description: 'Charge exceeds Fair Market Rate significantly, suggesting out-of-network balance billing.',
     severity: 'high' as const,
-    check: (ctx: { overcharges: any[] }) => ctx.overcharges.length > 0
+    check: (ctx: RuleContext) => ctx.overcharges.length > 0
   },
   {
     id: 'act-102-triad',
     name: 'Act 102 Triad Violation',
     description: 'Bill contains Emergency services at a Facility with indications of non-participating status.',
     severity: 'high' as const,
-    check: (ctx: { rawText: string }) => {
+    check: (ctx: RuleContext) => {
       const text = ctx.rawText.toUpperCase();
       const hasEmergency = text.includes('EMERGENCY') || text.includes('ER ') || text.includes('9928');
       const hasFacility = text.includes('HOSPITAL') || text.includes('CENTER') || text.includes('FACILITY');
       const hasOON = text.includes('OUT-OF-NETWORK') || text.includes('NON-PARTICIPATING') || text.includes('OON');
       return hasEmergency && hasFacility && hasOON;
     }
+  },
+  {
+    id: 'act-102-itemization-fail',
+    name: 'Incomplete Itemization',
+    description: 'Bill appears to be a summary statement lacking mandatory line-item CPT/HCPCS detail required by PA Act 102.',
+    severity: 'medium' as const,
+    check: (ctx: RuleContext) => ctx.cpt.length === 0 && ctx.rawText.length > 500
   }
 ];
 export const LETTER_TEMPLATES: Record<Language, { id: string; name: string; description: string; body: string }[]> = {
@@ -112,13 +130,13 @@ export const LETTER_TEMPLATES: Record<Language, { id: string; name: string; desc
       id: "us-itemized-request",
       name: "Act 102 Itemized Bill Request",
       description: "Request a detailed breakdown of all charges as required by PA state law.",
-      body: "To: Billing Department\nRe: Request for Itemized Bill (PA Act 102)\n\nI am writing to request a detailed, itemized statement for services rendered on {SERVICE_DATE} (Account: {ACCOUNT_NUMBER}). Per PA Act 102, I am entitled to an itemized bill containing CPT/HCPCS codes and individual pricing for each line item. Please provide this within 30 days."
+      body: "To: Billing Department\nRe: Request for Itemized Bill (PA Act 102)\n\nI am writing to request a detailed, itemized statement for services rendered on {SERVICE_DATE} (Account: {ACCOUNT_NUMBER}). Pursuant to Pennsylvania Act 102 § 3, I am entitled to receive a complete itemized bill containing all CPT/HCPCS codes and individual pricing for each line item. Failure to provide this within 30 days constitutes a violation of my statutory rights in the Commonwealth. Please provide this documentation immediately."
     },
     {
       id: "nsa-violation",
       name: "No Surprises Act Violation Dispute",
       description: "Dispute out-of-network charges for emergency services.",
-      body: "To: Billing Department\nRe: Dispute of Out-of-Network Charges (No Surprises Act)\n\nI am formally disputing the bill for services on {SERVICE_DATE} at {PROVIDER_NAME}. As these were emergency services, federal law (42 U.S.C. § 300gg-111) prohibits balance billing. My responsibility should be limited to in-network cost-sharing amounts."
+      body: "To: Billing Department\nRe: Dispute of Out-of-Network Charges (No Surprises Act)\n\nI am formally disputing the bill for services on {SERVICE_DATE} at {PROVIDER_NAME}. As these were emergency services, federal law (42 U.S.C. § 300gg-111) and Pennsylvania Act 102 prohibit balance billing. My responsibility is limited to in-network cost-sharing amounts. I request a re-adjudication of this claim based on these protections."
     }
   ],
   pl: [
@@ -126,7 +144,7 @@ export const LETTER_TEMPLATES: Record<Language, { id: string; name: string; desc
       id: "pl-itemized-request",
       name: "Wniosek o Rachunek Szczegółowy (Act 102)",
       description: "Poproś o szczegółowe zestawienie opłat zgodnie z prawem stanowym PA.",
-      body: "Do: Dział Rozliczeń\nDotyczy: Wniosek o rachunek szczegółowy (PA Act 102)\n\nZwracam się z prośbą o dostarczenie szczegółowego, wyszczególnionego zestawienia usług wykonanych w dniu {SERVICE_DATE} (Konto: {ACCOUNT_NUMBER}). Zgodnie z ustawą PA Act 102, mam prawo do otrzymania rachunku zawierającego kody CPT/HCPCS oraz indywidualne ceny za każdą pozycję. Proszę o dostarczenie go w ciągu 30 dni."
+      body: "Do: Dział Rozliczeń\nDotyczy: Wniosek o rachunek szczegółowy (PA Act 102)\n\nZwracam się z prośbą o dostarczenie szczegółowego, wyszczególnionego zestawienia usług wykonanych w dniu {SERVICE_DATE} (Konto: {ACCOUNT_NUMBER}). Zgodnie z ustawą PA Act 102 § 3, mam prawo do otrzymania rachunku zawierającego kody CPT/HCPCS oraz indywidualne ceny za każdą pozycję. Proszę o dostarczenie go w ciągu 30 dni."
     },
     {
       id: "pl-nsa-violation",
