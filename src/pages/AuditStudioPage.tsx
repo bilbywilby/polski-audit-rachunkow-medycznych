@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
   ShieldCheck,
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { extractTextFromPdf, analyzeBillText, exportLegalAuditPackage } from '@/lib/audit-engine';
 import { saveAudit, AuditRecord } from '@/lib/db';
 import { MAX_FILE_SIZE, PA_DOI_HOTLINE, TRANSPARENCY_TOOL_DISCLAIMER, PA_DOI_PORTAL_URL } from '@/data/constants';
@@ -38,6 +39,7 @@ export function AuditStudioPage() {
       setResult(analysis);
       setStep('results');
     } catch (error) {
+      console.error(error);
       toast.error('Review failed', { description: 'Could not analyze content.' });
       setStep('upload');
     }
@@ -53,6 +55,7 @@ export function AuditStudioPage() {
       const text = await extractTextFromPdf(files[0]);
       await handleProcess(text, files[0].name);
     } catch (error) {
+      console.error(error);
       toast.error('PDF Extraction Failed');
       setStep('upload');
     }
@@ -111,14 +114,14 @@ export function AuditStudioPage() {
               <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest px-2">
                 <ClipboardList className="h-4 w-4" /> Manual Text Entry
               </div>
-              <Textarea 
-                placeholder="Paste statement text here..." 
+              <Textarea
+                placeholder="Paste statement text here..."
                 className="min-h-[150px] rounded-3xl p-6 shadow-sm border-muted-foreground/20"
                 value={manualText}
                 onChange={(e) => setManualText(e.target.value)}
               />
-              <Button 
-                className="w-full h-14 text-xl font-bold rounded-2xl" 
+              <Button
+                className="w-full h-14 text-xl font-bold rounded-2xl"
                 disabled={!manualText.trim()}
                 onClick={() => handleProcess(manualText, 'Manual Review')}
               >
@@ -156,7 +159,11 @@ export function AuditStudioPage() {
                 }}>
                   <Download className="mr-2 h-4 w-4" /> Export Redacted JSON
                 </Button>
-                <Button className="rounded-2xl h-12" onClick={() => setStep('upload')}>Start New Review</Button>
+                <Button className="rounded-2xl h-12" onClick={() => {
+                  setStep('upload');
+                  setResult(null);
+                  setManualText('');
+                }}>Start New Review</Button>
               </div>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -166,7 +173,7 @@ export function AuditStudioPage() {
                   <p className="text-6xl font-bold mt-2 tracking-tighter">${result.totalAmount.toLocaleString()}</p>
                 </Card>
                 <Card className="rounded-3xl p-6 border-muted/50">
-                  <CardHeader><CardTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-green-500" /> Privacy & Redaction Report</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><CheckCircle2 className="h-5 w-5 text-green-500" /> Privacy & Redaction Report</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
                     <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-2xl flex items-center justify-between">
                       <span className="text-sm font-medium">Personally Identifiable Information (PII) Redacted</span>
@@ -180,14 +187,16 @@ export function AuditStudioPage() {
               </div>
               <div className="space-y-6">
                 <Card className="rounded-[2rem] bg-amber-50/50 border-amber-200 p-8 shadow-sm">
-                  <h3 className="font-bold text-amber-900 flex items-center gap-2 mb-4"><AlertTriangle className="h-5 w-5" /> Transparency Flags</h3>
+                  <h3 className="font-bold text-amber-900 flex items-center gap-2 mb-4 text-lg"><AlertTriangle className="h-5 w-5" /> Transparency Flags</h3>
                   <div className="space-y-4">
-                    {result.reviewPoints.map((p, i) => (
+                    {result.reviewPoints.length > 0 ? result.reviewPoints.map((p, i) => (
                       <div key={i} className="bg-white p-4 rounded-xl border border-amber-100 shadow-sm">
                         <p className="text-[10px] font-bold uppercase text-amber-600 tracking-wider">{p.type.replace('-', ' ')}</p>
                         <p className="text-sm text-amber-900 font-medium mt-1">{p.description}</p>
                       </div>
-                    ))}
+                    )) : (
+                      <p className="text-sm text-muted-foreground italic">No statutory flags identified.</p>
+                    )}
                   </div>
                 </Card>
                 <div className="bg-slate-900 text-white p-8 rounded-[2rem] space-y-6">

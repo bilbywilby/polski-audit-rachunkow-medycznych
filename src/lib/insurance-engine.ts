@@ -8,6 +8,7 @@ import {
 } from '@/data/constants';
 import { InsuranceFilingRecord, ReviewPoint } from './db';
 import * as pdfjs from 'pdfjs-dist';
+// Ensure worker is correctly linked from the public CDN
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 export async function extractTextFromFiling(file: File): Promise<string> {
   const extension = file.name.split('.').pop()?.toLowerCase();
@@ -23,7 +24,8 @@ export async function extractTextFromFiling(file: File): Promise<string> {
     return fullText;
   }
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+  const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+  const pdf = await loadingTask.promise;
   let fullText = '';
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
@@ -41,6 +43,7 @@ function redactFilingText(text: string): string {
 }
 export async function analyzeInsuranceFiling(text: string, fileName: string): Promise<InsuranceFilingRecord> {
   let carrier = 'Unknown Carrier';
+  // Logic Fix: Use standard regex escaping for keyword matching
   for (const [_, keywords] of Object.entries(PLAN_KEYWORDS)) {
     const found = keywords.find(k => {
       const escapedKeyword = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -79,7 +82,7 @@ export async function analyzeInsuranceFiling(text: string, fileName: string): Pr
         rule_id: 'excessive-rate-hike',
         statute_ref: PA_REVIEW_TAXONOMY['excessive-rate-hike'] || 'PA PID Review Standard',
         requires_review: true,
-        evidence_hash: '',
+        evidence_hash: 'statutory_flag',
         evidence_snippet: `Detected hike: ${rateHike}`
       }
     });
@@ -93,7 +96,7 @@ export async function analyzeInsuranceFiling(text: string, fileName: string): Pr
         rule_id: 'mlr-non-compliance',
         statute_ref: PA_REVIEW_TAXONOMY['mlr-non-compliance'] || 'ACA MLR Standard',
         requires_review: false,
-        evidence_hash: '',
+        evidence_hash: 'statutory_flag',
         evidence_snippet: `Detected MLR: ${mlrPercent}`
       }
     });

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { LETTER_TEMPLATES, PA_DOH_HOTLINE } from '@/data/constants';
-import { Copy, Printer, FileText, CheckCircle, Download, AlertTriangle, ShieldCheck, Gavel } from 'lucide-react';
+import { Download, FileText, Gavel, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { AuditRecord } from '@/lib/db';
 import { jsPDF } from 'jspdf';
@@ -27,12 +27,15 @@ export function LettersPage() {
     name: '',
     city: 'Philadelphia',
     state: 'PA',
-    provider: audit?.extractedData.providerName || '',
-    accountNumber: audit?.extractedData.accountNumber || '',
-    date: audit?.extractedData.dateOfService || '',
-    billDate: audit?.extractedData.billDate || '',
+    provider: audit?.extractedData?.providerName || '',
+    accountNumber: audit?.extractedData?.accountNumber || '',
+    date: audit?.extractedData?.dateOfService || '',
+    billDate: audit?.extractedData?.billDate || '',
     amount: audit?.totalAmount ? `${audit.totalAmount}` : ''
   });
+  useEffect(() => {
+    if (templates.length > 0) setSelected(templates[0]);
+  }, [templates]);
   const validationErrors = useMemo(() => {
     const errors: string[] = [];
     if (!form.name.trim()) errors.push("Patient Name is required.");
@@ -40,9 +43,6 @@ export function LettersPage() {
     if (!form.provider.trim()) errors.push("Facility Name is required.");
     return errors;
   }, [form]);
-  useEffect(() => {
-    if (templates.length > 0) setSelected(templates[0]);
-  }, [templates]);
   const letterBody = useMemo(() => {
     if (!selected) return "";
     let body = selected.body;
@@ -58,7 +58,7 @@ export function LettersPage() {
     if (includeCitations && audit?.reviewPoints && audit.reviewPoints.length > 0) {
       body += "\n\nSTATUTORY COMPLIANCE NOTES:";
       audit.reviewPoints.forEach(f => {
-        body += `\n- Education Point: ${f.type.toUpperCase().replace(/-/g, ' ')} (Ref: ${f.taxonomy?.statute_ref})`;
+        body += `\n- Education Point: ${f.type.toUpperCase().replace(/-/g, ' ')} (Ref: ${f.taxonomy?.statute_ref || 'PA Act 102'})`;
       });
     }
     if (audit?.fapEligible) {
@@ -71,32 +71,37 @@ export function LettersPage() {
       toast.error("Compliance Error", { description: "Complete all fields to ensure legal validity in PA." });
       return;
     }
-    const doc = new jsPDF();
-    const splitText = doc.splitTextToSize(letterBody, 170);
-    doc.setFont("times", "normal");
-    doc.setFontSize(10);
-    doc.text(`Reference: ${form.accountNumber}`, 20, 20);
-    doc.text(`${form.city}, ${form.state}`, 190, 20, { align: 'right' });
-    doc.text(new Date().toLocaleDateString(), 190, 25, { align: 'right' });
-    doc.setFontSize(12);
-    doc.setFont("times", "bold");
-    doc.text(form.name, 20, 45);
-    doc.setFont("times", "normal");
-    doc.text(`Account: ${form.accountNumber}`, 20, 50);
-    doc.setFont("times", "bold");
-    doc.text("NOTICE OF FORMAL BILLING DISPUTE & FAP REQUEST", 105, 70, { align: 'center' });
-    doc.line(70, 72, 140, 72);
-    doc.setFont("times", "normal");
-    doc.text(splitText, 20, 90);
-    const finalY = 90 + (splitText.length * 7) + 20;
-    doc.text("Sincerely,", 20, Math.min(finalY, 260));
-    doc.text(form.name.toUpperCase(), 20, Math.min(finalY + 15, 275));
-    doc.setFontSize(8);
-    doc.setFont("times", "italic");
-    doc.text(`Secondary Remediation: PA DOH Consumer Hotline ${PA_DOH_HOTLINE}`, 20, 285);
-    doc.text(`Signed via BillGuard PA Auditor Registry (Audit Hash: ${audit?.fingerprint?.substring(0, 12)})`, 20, 290);
-    doc.save(`PA_Dispute_Letter_${form.accountNumber}.pdf`);
-    toast.success('Statutory PDF Generated');
+    try {
+      const doc = new jsPDF();
+      const splitText = doc.splitTextToSize(letterBody, 170);
+      doc.setFont("times", "normal");
+      doc.setFontSize(10);
+      doc.text(`Reference: ${form.accountNumber}`, 20, 20);
+      doc.text(`${form.city}, ${form.state}`, 190, 20, { align: 'right' });
+      doc.text(new Date().toLocaleDateString(), 190, 25, { align: 'right' });
+      doc.setFontSize(12);
+      doc.setFont("times", "bold");
+      doc.text(form.name, 20, 45);
+      doc.setFont("times", "normal");
+      doc.text(`Account: ${form.accountNumber}`, 20, 50);
+      doc.setFont("times", "bold");
+      doc.text("NOTICE OF FORMAL BILLING DISPUTE & FAP REQUEST", 105, 70, { align: 'center' });
+      doc.line(70, 72, 140, 72);
+      doc.setFont("times", "normal");
+      doc.text(splitText, 20, 90);
+      const finalY = 90 + (splitText.length * 7) + 20;
+      doc.text("Sincerely,", 20, Math.min(finalY, 260));
+      doc.text(form.name.toUpperCase(), 20, Math.min(finalY + 15, 275));
+      doc.setFontSize(8);
+      doc.setFont("times", "italic");
+      doc.text(`Secondary Remediation: PA DOH Consumer Hotline ${PA_DOH_HOTLINE}`, 20, 285);
+      doc.text(`Signed via BillGuard PA Auditor Registry (Audit Hash: ${audit?.fingerprint?.substring(0, 12) || 'N/A'})`, 20, 290);
+      doc.save(`PA_Dispute_Letter_${form.accountNumber}.pdf`);
+      toast.success('Statutory PDF Generated');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to generate PDF');
+    }
   };
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
@@ -192,7 +197,7 @@ export function LettersPage() {
               {letterBody}
             </div>
             <div className="pt-10 border-t border-dashed">
-              <p className="text-[10px] text-slate-500 font-sans italic">Remediation Path: PA Department of Health Consumer Hotline ${PA_DOH_HOTLINE}</p>
+              <p className="text-[10px] text-slate-500 font-sans italic">Remediation Path: PA Department of Health Consumer Hotline {PA_DOH_HOTLINE}</p>
             </div>
           </div>
         </Card>
