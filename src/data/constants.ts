@@ -42,6 +42,11 @@ export const PA_RESOURCES = {
   ],
   pl: []
 };
+export const PID_RESOURCES = [
+  { name: "PA Insurance Dept (PID) Filings", url: "https://www.insurance.pa.gov/Companies/ProductServices/Pages/Health-Insurance-Rate-Filings.aspx", type: "regulatory" },
+  { name: "Pennie Public Portal", url: "https://pennie.com/", type: "exchange" },
+  { name: "SERFF Public Access", url: "https://filingaccess.serff.com/sfa/home/pa", type: "data" }
+];
 export const CODE_PATTERNS = {
   cpt: /\b\d{5}(?:-[A-Z0-9]{2})?\b/g,
   hcpcs: /\b[A-Z]\d{4}\b/g,
@@ -54,6 +59,13 @@ export const CODE_PATTERNS = {
   date: /\b(0?[1-9]|1[012])[- /.](0?[1-9]|[12][0-9]|3[01])[- /.](19|20)\d\d\b/g,
   npi: /\b\d{10}\b/g,
   zip: /\b\d{5}(?:-\d{4})?\b/g
+};
+export const INSURANCE_PATTERNS = {
+  premium: /\$\s?\d+(?:,\d{3})*(?:\.\d{2})?\s?\/\s?(?:mo|month|mbr)/gi,
+  actuarial_value: /\b(?:AV|Actuarial Value)\s*(?::|is)?\s*(\d{2}(?:\.\d+)?%)\b/gi,
+  mlr: /\b(?:MLR|Medical Loss Ratio)\s*(?::|is)?\s*(\d{2,3}(?:\.\d+)?%)\b/gi,
+  county_code: /\b(?:FIPS|County Code)\s*(?::|#)?\s*(\d{5})\b/gi,
+  rate_hike: /\b(?:Requested Rate Change|Impact)\s*(?::|is)?\s*([-+]?\d{1,2}(?:\.\d+)?%)\b/gi
 };
 export const REDACTION_PATTERNS = {
   ssn: /\b\d{3}-\d{2}-\d{4}\b/g,
@@ -71,7 +83,9 @@ export const PA_VIOLATION_TAXONOMY: Record<string, string> = {
   'act-102-triad': 'PA Act 102 § 3 (Right to Itemized Bill / Emergency Protections)',
   'fair-market-overcharge': 'Pennsylvania Unfair Trade Practices and Consumer Protection Law (UTPCPL)',
   'upcoding-detected': 'PA Act 102 Quality Standards',
-  'unbundling-detected': 'PA Act 102 Quality Standards / CCI Edits'
+  'unbundling-detected': 'PA Act 102 Quality Standards / CCI Edits',
+  'excessive-rate-hike': 'PA PID Review Standard - Title 40 P.S. § 710.1',
+  'mlr-non-compliance': 'ACA MLR Standard - 45 CFR Part 158'
 };
 export const FAIR_BENCHMARKS: Record<string, number> = {
   "99213": 135,
@@ -80,6 +94,12 @@ export const FAIR_BENCHMARKS: Record<string, number> = {
   "99284": 490,
   "80053": 55,
   "85025": 45
+};
+export const FAIR_RATE_BENCHMARKS: Record<string, Record<string, number>> = {
+  "Allegheny": { "Bronze": 380, "Silver": 495, "Gold": 590 },
+  "Philadelphia": { "Bronze": 420, "Silver": 540, "Gold": 650 },
+  "Montgomery": { "Bronze": 410, "Silver": 525, "Gold": 630 },
+  "Default": { "Bronze": 400, "Silver": 510, "Gold": 610 }
 };
 export const PA_RULES = [
   {

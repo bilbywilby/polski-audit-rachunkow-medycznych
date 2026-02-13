@@ -7,7 +7,8 @@ import {
   History,
   LayoutDashboard,
   Search,
-  Languages
+  Languages,
+  TrendingUp
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -29,6 +30,7 @@ export function AppSidebar(): JSX.Element {
   const menuItems = [
     { title: t('nav.dashboard'), icon: LayoutDashboard, url: "/" },
     { title: t('nav.audit'), icon: Search, url: "/audit" },
+    { title: t('nav.insurancerates'), icon: TrendingUp, url: "/insurance-audit" },
     { title: t('nav.history'), icon: History, url: "/history" },
   ];
   const knowledgeItems = [
@@ -95,7 +97,7 @@ export function AppSidebar(): JSX.Element {
             onClick={toggleLanguage}
           >
             <Languages className="h-4 w-4" />
-            {language === 'pl' ? 'English (US)' : 'Przełącz na Polski'}
+            {language === 'pl' ? 'English (US)' : 'Przeł��cz na Polski'}
           </Button>
           <div className="rounded-lg bg-muted p-3 text-[10px] text-muted-foreground border border-border">
             <p className="font-bold text-foreground mb-1 uppercase tracking-wider">Local-First / HIPAA</p>
