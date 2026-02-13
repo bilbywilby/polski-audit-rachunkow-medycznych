@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { LETTER_TEMPLATES } from '@/data/constants';
-import { Copy, Printer, FileText, CheckCircle } from 'lucide-react';
+import { Copy, Printer, FileText, CheckCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { AuditRecord } from '@/lib/db';
+import { jsPDF } from 'jspdf';
 export function LettersPage() {
   const location = useLocation();
   const audit = location.state?.audit as AuditRecord | undefined;
@@ -42,6 +43,35 @@ export function LettersPage() {
   const handlePrint = () => {
     window.print();
   };
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    const splitText = doc.splitTextToSize(letterBody, 170);
+    doc.setFont("times", "normal");
+    doc.setFontSize(10);
+    doc.text(`Reference: ${form.accountNumber || 'PENDING'}`, 20, 20);
+    doc.text(`${form.city}, ${form.state}`, 190, 20, { align: 'right' });
+    doc.text(new Date().toLocaleDateString(undefined, { dateStyle: 'long' }), 190, 25, { align: 'right' });
+    doc.setFontSize(12);
+    doc.setFont("times", "bold");
+    doc.text(form.name || "Patient Name", 20, 45);
+    doc.setFont("times", "normal");
+    doc.text(`Account: ${form.accountNumber}`, 20, 50);
+    doc.setFont("times", "bold");
+    doc.text("NOTICE OF FORMAL BILLING DISPUTE", 105, 70, { align: 'center' });
+    doc.line(70, 72, 140, 72);
+    doc.setFont("times", "normal");
+    doc.text(splitText, 20, 90);
+    const finalY = 90 + (splitText.length * 7) + 20;
+    doc.text("Sincerely,", 20, finalY);
+    doc.line(20, finalY + 15, 70, finalY + 15);
+    doc.setFont("times", "bold");
+    doc.text(form.name.toUpperCase() || "SIGNATURE", 20, finalY + 20);
+    doc.setFont("times", "italic");
+    doc.setFontSize(8);
+    doc.text("Dispatched via BillGuard PA Secure Portal", 20, finalY + 25);
+    doc.save(`Dispute_Letter_${form.accountNumber || 'Draft'}.pdf`);
+    toast.success('PDF Generated successfully');
+  };
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
       <div className="lg:col-span-5 space-y-8 no-print">
@@ -54,9 +84,9 @@ export function LettersPage() {
           <ScrollArea className="h-[300px] rounded-xl border p-2">
             <div className="space-y-2">
               {templates.map(t => (
-                <button 
-                  key={t.id} 
-                  onClick={() => setSelected(t)} 
+                <button
+                  key={t.id}
+                  onClick={() => setSelected(t)}
                   className={`w-full text-left p-4 rounded-xl border-2 transition-all hover:bg-muted/50 ${selected.id === t.id ? 'border-primary bg-primary/5' : 'border-transparent'}`}
                 >
                   <div className="flex justify-between items-center mb-1">
@@ -109,8 +139,11 @@ export function LettersPage() {
             <Button variant="outline" size="sm" className="rounded-lg" onClick={() => { navigator.clipboard.writeText(letterBody); toast.success('Copied to clipboard'); }}>
               <Copy className="h-4 w-4 mr-2" /> Copy
             </Button>
+            <Button variant="outline" size="sm" className="rounded-lg" onClick={handleDownloadPDF}>
+              <Download className="h-4 w-4 mr-2" /> PDF
+            </Button>
             <Button size="sm" className="rounded-lg" onClick={handlePrint}>
-              <Printer className="h-4 w-4 mr-2" /> Print PDF
+              <Printer className="h-4 w-4 mr-2" /> Print
             </Button>
           </div>
         </div>
@@ -146,9 +179,6 @@ export function LettersPage() {
             </div>
           </div>
         </Card>
-        <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl text-blue-800 text-xs no-print">
-          <strong>Pro-tip:</strong> Pennsylvania hospitals are required to respond to itemized bill requests within 30 days under Act 102. If they fail to do so, contact the PA Insurance Department.
-        </div>
       </div>
     </div>
   );

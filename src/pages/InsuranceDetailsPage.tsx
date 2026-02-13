@@ -76,10 +76,10 @@ export function InsuranceDetailsPage() {
                 <TabsTrigger value="compliance" className="rounded-lg">Statutory Review</TabsTrigger>
               </TabsList>
               <TabsContent value="analysis" className="space-y-6">
-                <Card className="rounded-2xl p-6 space-y-4 border-muted/50">
+                <Card className="rounded-2xl p-6 space-y-4">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="h-5 w-5 text-primary" />
-                    <h3 className="font-bold text-lg">Hike Comparison</h3>
+                    <h3 className="font-bold text-lg">Market Comparison</h3>
                   </div>
                   <p className="text-muted-foreground text-sm">
                     This requested hike of <span className="text-foreground font-bold">{filing.extractedData.avgRateHike}</span> is 
@@ -119,12 +119,12 @@ export function InsuranceDetailsPage() {
                 </div>
               </TabsContent>
               <TabsContent value="compliance" className="space-y-6">
-                {filing.reviewPoints?.map((point, idx) => (
+                {filing.flags.map((flag, idx) => (
                   <Card key={idx} className="rounded-2xl border-amber-200 bg-amber-50/30">
                     <CardHeader className="pb-3">
                       <div className="flex items-center gap-2">
                         <AlertCircle className="h-5 w-5 text-amber-600" />
-                        <CardTitle className="text-lg">{point.description}</CardTitle>
+                        <CardTitle className="text-lg">{flag.description}</CardTitle>
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -132,13 +132,13 @@ export function InsuranceDetailsPage() {
                         <Gavel className="h-4 w-4 text-amber-700 mt-1" />
                         <div>
                           <p className="text-xs font-bold text-amber-900 uppercase">Statutory Basis</p>
-                          <p className="text-sm text-amber-800 font-medium">{point.taxonomy?.statute_ref}</p>
+                          <p className="text-sm text-amber-800 font-medium">{flag.taxonomy?.statute_ref}</p>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                 ))}
-                {(!filing.reviewPoints || filing.reviewPoints.length === 0) && (
+                {filing.flags.length === 0 && (
                   <div className="py-20 text-center text-muted-foreground italic border-2 border-dashed rounded-3xl">
                     No statutory violations detected. Rate hike falls within standard ranges.
                   </div>

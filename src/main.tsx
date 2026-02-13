@@ -21,6 +21,7 @@ import { HistoryPage } from '@/pages/HistoryPage';
 import { LettersPage } from '@/pages/LettersPage';
 import { AuditDetailsPage } from '@/pages/AuditDetailsPage';
 import { InsuranceAuditPage } from '@/pages/InsuranceAuditPage';
+import { InsuranceDetailsPage } from '@/pages/InsuranceDetailsPage';
 const queryClient = new QueryClient();
 const router = createBrowserRouter([
   {
@@ -32,6 +33,7 @@ const router = createBrowserRouter([
       { path: "audit", element: <AuditStudioPage /> },
       { path: "audit/:id", element: <AuditDetailsPage /> },
       { path: "insurance-audit", element: <InsuranceAuditPage /> },
+      { path: "insurance-audit/:id", element: <InsuranceDetailsPage /> },
       { path: "glossary", element: <GlossaryPage /> },
       { path: "resources", element: <ResourcesPage /> },
       { path: "history", element: <HistoryPage /> },
