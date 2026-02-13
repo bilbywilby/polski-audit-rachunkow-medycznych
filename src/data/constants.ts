@@ -26,74 +26,111 @@ export const CODE_PATTERNS = {
   hcpcs: /\b[A-Z]\d{4}[A-Z]?\b/g,
   revenue: /\b(0\d{3}|[1-9]\d{3})\b/g,
   npi: /\b[1-9]\d{9}\b/g,
-  amounts: /\$\d+(,\d{3})*(\.\d{2})?/g
+  amounts: /\$\d+(,\d{3})*(\.\d{2})?/g,
+  policy: /\b(Group|Policy|ID|Member)\s*(?:#|No\.?)?\s*([A-Z0-9-]{6,15})\b/i,
+  date: /\b(0?[1-9]|1[012])[- /.](0?[1-9]|[12][0-9]|3[01])[- /.](19|20)\d\d\b/g
 };
 export const REDACTION_PATTERNS = {
   ssn: /\b\d{3}-\d{2}-\d{4}\b/g,
   phone: /\b(?:\+?1[-. ]?)?\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}\b/g,
   email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
-  dob: /\b(?:\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\b/g
+  dob: /\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b/g
 };
+export const PA_COST_BENCHMARKS = [
+  { code: "99213", description: "Office Visit (Est. Patient, Low Complexity)", avgCost: 110 },
+  { code: "99214", description: "Office Visit (Est. Patient, Moderate Complexity)", avgCost: 165 },
+  { code: "99215", description: "Office Visit (Est. Patient, High Complexity)", avgCost: 240 },
+  { code: "99283", description: "ER Visit (Moderate Complexity)", avgCost: 350 },
+  { code: "99284", description: "ER Visit (High Complexity)", avgCost: 580 },
+  { code: "99285", description: "ER Visit (Highest Complexity/Life Threat)", avgCost: 890 },
+  { code: "80053", description: "Comprehensive Metabolic Panel", avgCost: 45 },
+  { code: "85025", description: "CBC with Differential", avgCost: 32 },
+  { code: "71045", description: "Chest X-Ray (1 View)", avgCost: 95 },
+  { code: "71046", description: "Chest X-Ray (2 Views)", avgCost: 125 },
+  { code: "93000", description: "EKG (Routine)", avgCost: 65 },
+  { code: "36415", description: "Routine Blood Draw", avgCost: 15 },
+  { code: "45378", description: "Colonoscopy (Diagnostic)", avgCost: 1200 },
+  { code: "70450", description: "CT Scan Head (No Contrast)", avgCost: 450 },
+  { code: "74177", description: "CT Scan Abdomen/Pelvis (Contrast)", avgCost: 850 },
+  { code: "77067", description: "Screening Mammography", avgCost: 185 },
+  { code: "99203", description: "New Patient Office Visit (Moderate)", avgCost: 180 }
+];
+export interface RuleContext {
+  rawText: string;
+  codes: string[];
+  overcharges: any[];
+}
 export const PA_RULES = [
   {
     id: 'balance-billing',
     name: 'Balance Billing Check',
     description: 'Potential No Surprises Act violation. Out-of-network rates detected without clear patient consent documentation.',
     severity: 'high' as const,
-    check: (text: string) => /out-of-network|non-participating|balance due|patient responsibility/i.test(text)
+    check: (ctx: RuleContext) => /out-of-network|non-participating|balance due|patient responsibility/i.test(ctx.rawText)
   },
   {
     id: 'upcoding',
     name: 'Upcoding Risk',
     description: 'High-intensity Level 5 codes found (99215/99205). These are often used to overcharge for routine visits.',
     severity: 'medium' as const,
-    check: (text: string) => /\b(99215|99205|99285)\b/.test(text)
+    check: (ctx: RuleContext) => /\b(99215|99205|99285)\b/.test(ctx.rawText)
   },
   {
     id: 'facility-fee',
     name: 'ER Facility Fee',
     description: 'Revenue code 0450 detected. Pennsylvania patients are often billed separate "Room Fees" which may be negotiable.',
     severity: 'low' as const,
-    check: (text: string) => /\b0450\b/.test(text)
+    check: (ctx: RuleContext) => /\b0450\b/.test(ctx.rawText)
   },
   {
     id: 'unbundling',
     name: 'Unbundling Pattern',
     description: 'A high volume of procedural codes suggests a single surgery may have been broken into multiple charges.',
     severity: 'high' as const,
-    check: (text: string) => {
-      const matches = text.match(/\b\d{5}\b/g) || [];
-      return matches.length > 8;
-    }
+    check: (ctx: RuleContext) => ctx.codes.length > 8
   },
   {
     id: 'clerical',
     name: 'Clerical/Coding Linkage',
     description: 'Procedures found without corresponding ICD-10 diagnostic codes. This mismatch can be used to dispute bill validity.',
     severity: 'low' as const,
-    check: (text: string) => {
-      const hasCpt = /\b\d{5}\b/.test(text);
-      const hasIcd = /\b[A-TV-Z]\d{2}[A-Z0-9]\b/.test(text);
+    check: (ctx: RuleContext) => {
+      const hasCpt = ctx.codes.some(c => /^\d{5}$/.test(c));
+      const hasIcd = ctx.rawText.match(/\b[A-TV-Z]\d{2}[A-Z0-9]\b/);
       return hasCpt && !hasIcd;
     }
+  },
+  {
+    id: 'duplicate-billing',
+    name: 'Duplicate Billing',
+    description: 'The same procedure code appears multiple times. This may be a clerical error causing double-charging.',
+    severity: 'medium' as const,
+    check: (ctx: RuleContext) => new Set(ctx.codes).size !== ctx.codes.length
+  },
+  {
+    id: 'missing-policy',
+    name: 'Missing Insurance Context',
+    description: 'No insurance policy or group ID was found on this statement. Hospitals may be billing at higher self-pay rates.',
+    severity: 'low' as const,
+    check: (ctx: RuleContext) => !/Policy|Group|ID|Member/i.test(ctx.rawText)
   }
 ];
 export const LETTER_TEMPLATES = [
-  { 
-    id: "general-dispute", 
-    name: "General Billing Dispute", 
+  {
+    id: "general-dispute",
+    name: "General Billing Dispute",
     description: "Standard template for disputing incorrect charges or clerical errors.",
-    body: "I am writing to formally dispute charges for services on [DATE_OF_SERVICE]. My audit indicates specific coding levels do not reflect the complexity of the visit. I request an itemized bill with CPT and ICD-10 codes for total amount $[TOTAL_AMOUNT]."
+    body: "I am writing to formally dispute charges for services on [DATE_OF_SERVICE]. My audit indicates specific coding levels do not reflect the complexity of the visit. I request an itemized bill with CPT and ICD-10 codes for total amount $[TOTAL_AMOUNT]. [OVERCHARGES_SUMMARY]"
   },
-  { 
-    id: "surprise-bill", 
-    name: "No Surprises Act Violation", 
+  {
+    id: "surprise-bill",
+    name: "No Surprises Act Violation",
     description: "For out-of-network emergency care or non-consented provider charges.",
-    body: "This bill for $[TOTAL_AMOUNT] appears to violate the No Surprises Act. As I received emergency care, I am only responsible for my in-network cost-sharing amount. Please adjust the balance accordingly."
+    body: "This bill for $[TOTAL_AMOUNT] appears to violate the No Surprises Act. As I received emergency care on [DATE_LIST], I am only responsible for my in-network cost-sharing amount. Please adjust the balance accordingly."
   },
-  { 
-    id: "financial-assistance", 
-    name: "Charity Care Request", 
+  {
+    id: "financial-assistance",
+    name: "Charity Care Request",
     description: "Application for hospital financial assistance based on income (HCAP).",
     body: "I am requesting an application for Financial Assistance (Charity Care) as per PA Act 32. My bill for $[TOTAL_AMOUNT] represents a significant hardship. Please send the necessary forms to [PATIENT_NAME]."
   },
@@ -101,7 +138,7 @@ export const LETTER_TEMPLATES = [
     id: "coding-audit",
     name: "Coding Audit Request",
     description: "Request for a formal coding review when upcoding or unbundling is suspected.",
-    body: "My audit of bill #[ACCOUNT_NUMBER] detected potential coding errors involving codes [CPT_CODES]. I request a formal review of these charges against NCCI edits to ensure no unbundling has occurred."
+    body: "My audit of bill #[ACCOUNT_NUMBER] detected potential coding errors involving codes [CPT_CODES]. These services occurred on [DATE_LIST]. I request a formal review of these charges against NCCI edits."
   },
   {
     id: "payment-plan",

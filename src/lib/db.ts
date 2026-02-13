@@ -1,4 +1,11 @@
 import { openDB, IDBPDatabase } from 'idb';
+export interface OverchargeItem {
+  code: string;
+  description: string;
+  billedAmount: number;
+  benchmarkAmount: number;
+  percentOver: number;
+}
 export interface AuditRecord {
   id: string;
   date: string;
@@ -11,6 +18,13 @@ export interface AuditRecord {
   detectedHcpcs?: string[];
   detectedRevenue?: string[];
   detectedNpi?: string[];
+  extractedData: {
+    providerName?: string;
+    dateOfService?: string;
+    policyId?: string;
+    allDates?: string[];
+  };
+  overcharges: OverchargeItem[];
   flags: {
     type: string;
     severity: 'low' | 'medium' | 'high';
@@ -20,7 +34,7 @@ export interface AuditRecord {
 }
 const DB_NAME = 'billguard-pa-db';
 const STORE_NAME = 'audits';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 let dbPromise: Promise<IDBPDatabase> | null = null;
 function getDB() {
   if (!dbPromise) {
