@@ -8,10 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ArrowLeft, AlertTriangle, Lock, ShieldCheck, ClipboardList, Gavel, Download, Fingerprint, Activity } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Lock, ShieldCheck, ClipboardList, Gavel, Download, Fingerprint, Activity, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { exportLegalAuditPackage } from '@/lib/audit-engine';
 import { toast } from 'sonner';
+import { BENCHMARK_DISCLAIMER, PA_DOI_DISCLAIMER } from '@/data/constants';
 export function AuditDetailsPage() {
   const { id } = useParams();
   const [audit, setAudit] = useState<AuditRecord | null>(null);
@@ -33,11 +34,11 @@ export function AuditDetailsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Legal_Audit_Package_${audit.id.substring(0, 8)}.json`;
+    a.download = `Education_Review_Export_${audit.id.substring(0, 8)}.json`;
     a.click();
-    toast.success('Legal Audit Package Exported');
+    toast.success('Redacted Review Exported');
   };
-  if (!audit) return <div className="py-20 text-center text-muted-foreground animate-pulse">Retrieving audit record...</div>;
+  if (!audit) return <div className="py-20 text-center text-muted-foreground animate-pulse">Retrieving review record...</div>;
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between gap-6">
@@ -49,91 +50,62 @@ export function AuditDetailsPage() {
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline" className="rounded-lg">{format(new Date(audit.date), 'MMMM d, yyyy')}</Badge>
             <Badge className="bg-blue-600 text-white rounded-lg">{audit.planType}</Badge>
-            <Badge variant={audit.status === 'clean' ? 'secondary' : 'destructive'} className="rounded-lg font-bold uppercase">{audit.status}</Badge>
+            <Badge variant={audit.status === 'clean' ? 'secondary' : 'destructive'} className="rounded-lg font-bold uppercase">
+              {audit.status === 'flagged' ? 'REVIEW POINT' : audit.status}
+            </Badge>
           </div>
         </div>
         <div className="flex gap-4">
           <Button variant="outline" className="rounded-2xl border-purple-500 text-purple-600 h-12" onClick={handleLegalExport}>
-            <Download className="mr-2 h-4 w-4" /> Legal Package
+            <Download className="mr-2 h-4 w-4" /> Education Export
           </Button>
           <Button asChild size="lg" className="rounded-2xl px-8 shadow-lg h-12">
             <Link to="/letters" state={{ audit }}>Generate Dispute</Link>
           </Button>
         </div>
       </div>
+      <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3">
+        <Info className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+        <p className="text-xs font-medium text-amber-900 leading-relaxed italic">{BENCHMARK_DISCLAIMER}</p>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <Card className="p-8 bg-slate-900 text-white rounded-[2rem] border-none relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-10 opacity-10"><ShieldCheck className="h-40 w-40 -mr-10 -mt-10" /></div>
-              <p className="text-xs font-bold uppercase opacity-60 tracking-widest">Total Billed</p>
-              <p className="text-6xl font-bold mt-2 tracking-tighter">${audit.totalAmount.toLocaleString()}</p>
-            </Card>
-            {audit.fapEligible && (
-              <Card className="p-8 bg-indigo-600 text-white rounded-[2rem] border-none shadow-xl shadow-indigo-500/20">
-                <p className="text-xs font-bold uppercase opacity-60 tracking-widest">FAP ELIGIBLE</p>
-                <p className="text-2xl font-bold mt-2">Hospital Financial Aid screening recommended.</p>
-              </Card>
-            )}
-          </div>
-          <Tabs defaultValue="violations" className="w-full">
+          <Card className="p-8 bg-slate-900 text-white rounded-[2rem] border-none">
+            <p className="text-xs font-bold uppercase opacity-60 tracking-widest">Review Point Value</p>
+            <p className="text-6xl font-bold mt-2 tracking-tighter">${audit.totalAmount.toLocaleString()}</p>
+          </Card>
+          <Tabs defaultValue="points" className="w-full">
             <TabsList className="bg-muted p-1 rounded-xl mb-6">
-              <TabsTrigger value="violations" className="rounded-lg">Regulatory Analysis</TabsTrigger>
-              <TabsTrigger value="evidence" className="rounded-lg">Compliance Evidence</TabsTrigger>
-              <TabsTrigger value="raw" className="rounded-lg">Raw Data</TabsTrigger>
+              <TabsTrigger value="points" className="rounded-lg">Review Points</TabsTrigger>
+              <TabsTrigger value="evidence" className="rounded-lg">Benchmark Logic</TabsTrigger>
+              <TabsTrigger value="raw" className="rounded-lg">Secure Data</TabsTrigger>
             </TabsList>
-            <TabsContent value="violations" className="space-y-6">
-              {audit.overcharges.map((item, idx) => (
-                <Card key={idx} className="rounded-2xl border-amber-200 bg-amber-50/30">
-                  <CardHeader className="pb-3 flex-row justify-between items-start">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-5 w-5 text-amber-600" />
-                        <CardTitle className="text-lg">{item.description}</CardTitle>
-                      </div>
-                      <p className="text-xs text-amber-700 font-medium">Billed: ${item.billedAmount} vs Medicare Proxy: ${item.medicareProxyAmount?.toFixed(2)}</p>
-                    </div>
-                    {item.legalCitation && (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-10 w-10 text-indigo-600 bg-white/50 rounded-full"><Gavel className="h-5 w-5" /></Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80 rounded-2xl p-4">
-                          <p className="font-bold text-sm text-indigo-700">{item.legalCitation}</p>
-                          <p className="text-xs text-muted-foreground mt-1">{item.statutoryReference}</p>
-                        </PopoverContent>
-                      </Popover>
-                    )}
-                  </CardHeader>
-                </Card>
-              ))}
-              {audit.flags.map((flag, idx) => (
-                <Card key={`flag-${idx}`} className="rounded-2xl border-muted/50 p-6 flex gap-4">
+            <TabsContent value="points" className="space-y-6">
+              {audit.reviewPoints.map((point, idx) => (
+                <Card key={idx} className="rounded-2xl border-muted/50 p-6 flex gap-4">
                   <Activity className="h-6 w-6 text-primary shrink-0" />
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="font-bold text-sm uppercase tracking-wide">{flag.type.replace('-', ' ')}</p>
-                      <Badge className={flag.severity === 'high' ? 'bg-red-500' : 'bg-amber-500'}>{flag.severity}</Badge>
+                      <p className="font-bold text-sm uppercase tracking-wide">{point.type.replace('-', ' ')}</p>
+                      <Badge className={point.severity === 'high' ? 'bg-red-500' : 'bg-amber-500'}>{point.severity}</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">{flag.description}</p>
-                    <p className="text-[10px] font-bold text-primary mt-2 uppercase">Statute: {flag.taxonomy?.statute_ref}</p>
+                    <p className="text-sm text-muted-foreground">{point.description}</p>
+                    <p className="text-[10px] font-bold text-primary mt-2 uppercase">Ref: {point.taxonomy?.statute_ref}</p>
                   </div>
                 </Card>
               ))}
             </TabsContent>
             <TabsContent value="evidence" className="space-y-6">
-              {audit.flags.map((flag, idx) => (
-                <Card key={idx} className="rounded-2xl p-6 space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
-                      <Fingerprint className="h-3 w-3" /> Integrity Hash (SHA-256)
-                    </Label>
-                    <code className="block p-3 bg-muted rounded-lg text-[10px] break-all font-mono opacity-70">
-                      {flag.taxonomy?.evidence_hash}
-                    </code>
+              {audit.overcharges.map((item, idx) => (
+                <Card key={idx} className="rounded-2xl p-6 border-indigo-200 bg-indigo-50/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Gavel className="h-4 w-4 text-indigo-700" />
+                    <p className="font-bold text-indigo-900">Education Point: {item.code}</p>
                   </div>
-                  <div className="p-4 bg-muted/30 rounded-xl italic text-sm text-foreground/80 border-l-4 border-indigo-500">
-                    "{flag.taxonomy?.evidence_snippet}"
+                  <p className="text-sm text-indigo-800 leading-relaxed">{item.description}</p>
+                  <div className="mt-4 flex gap-4 text-xs font-bold uppercase tracking-widest text-indigo-400">
+                    <span>Benchmark: ${item.benchmarkAmount}</span>
+                    <span>Medicare Proxy: ${item.medicareProxyAmount?.toFixed(2)}</span>
                   </div>
                 </Card>
               ))}
@@ -141,15 +113,16 @@ export function AuditDetailsPage() {
             <TabsContent value="raw">
               <Card className="rounded-2xl overflow-hidden border-muted/50">
                 <div className="p-4 border-b flex justify-between items-center bg-muted/20">
-                  <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase"><Lock className="h-3 w-3" /> Secure Redacted View</div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase"><Lock className="h-3 w-3" /> Redacted Session View</div>
                   <div className="flex items-center gap-2">
                     <Label htmlFor="pii" className="text-[10px] uppercase font-bold">Unmask PII</Label>
                     <Switch id="pii" checked={showPII} onCheckedChange={handlePIIToggle} />
                   </div>
                 </div>
-                <div className="p-8 bg-slate-50 dark:bg-slate-900/50 max-h-[500px] overflow-y-auto">
+                <div className="p-8 bg-slate-50 dark:bg-slate-900/50 max-h-[400px] overflow-y-auto">
                   <pre className="font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
-                    {showPII ? audit.rawText : audit.redactedText}
+                    {showPII && audit.rawText ? audit.rawText : audit.redactedText}
+                    {showPII && !audit.rawText && "[PHI MEMORY PURGE ACTIVE - RAW TEXT NOT PRESERVED]"}
                   </pre>
                 </div>
               </Card>
@@ -157,35 +130,23 @@ export function AuditDetailsPage() {
           </Tabs>
         </div>
         <div className="space-y-6">
-          <Card className="rounded-3xl border-muted/50 shadow-sm">
-            <CardHeader><CardTitle className="text-lg">Metadata</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              {[
-                { label: 'Facility', value: audit.extractedData.providerName, icon: ShieldCheck },
-                { label: 'Plan Type', value: audit.planType, icon: Gavel },
-                { label: 'CPT Detected', value: audit.detectedCpt.join(', ') || 'N/A', icon: ClipboardList }
-              ].map((m, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-muted/20">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <m.icon className="h-4 w-4" />
-                    <span className="text-xs font-bold uppercase">{m.label}</span>
-                  </div>
-                  <span className="text-sm font-bold text-foreground truncate max-w-[120px]">{m.value}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-          <div className="bg-indigo-600/5 border border-indigo-200 rounded-3xl p-6 space-y-4">
-            <h3 className="font-bold flex items-center gap-2 text-indigo-900">
-              <ShieldCheck className="h-5 w-5" /> Statutory Basis
-            </h3>
-            <p className="text-xs text-indigo-800 leading-relaxed">
-              This audit identifies potential violations of <strong>PA Act 102</strong> and <strong>42 U.S.C. § 300gg-111</strong>. These results can be used for formal disputes.
-            </p>
-            <Button className="w-full rounded-xl bg-indigo-600 text-white font-bold" asChild>
-              <Link to="/resources">Learn Your Rights</Link>
-            </Button>
-          </div>
+           <div className="bg-indigo-600 text-white rounded-3xl p-6 shadow-xl">
+             <h3 className="font-bold flex items-center gap-2 text-lg mb-2"><ShieldCheck className="h-5 w-5" /> Education Assistant</h3>
+             <p className="text-xs opacity-90 leading-relaxed italic">{PA_DOI_DISCLAIMER}</p>
+           </div>
+           <Card className="rounded-3xl border-muted/50 p-6">
+             <h4 className="font-bold mb-4 uppercase text-[10px] text-muted-foreground tracking-widest">Facility Metadata</h4>
+             <div className="space-y-4">
+               <div className="flex justify-between text-sm">
+                 <span className="text-muted-foreground">Provider</span>
+                 <span className="font-bold">{audit.extractedData.providerName || 'N/A'}</span>
+               </div>
+               <div className="flex justify-between text-sm">
+                 <span className="text-muted-foreground">Service Date</span>
+                 <span className="font-bold">{audit.extractedData.dateOfService || 'N/A'}</span>
+               </div>
+             </div>
+           </Card>
         </div>
       </div>
     </div>

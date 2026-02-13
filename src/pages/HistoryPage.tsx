@@ -37,11 +37,11 @@ export function HistoryPage() {
   };
   const handleClearAll = async () => {
     if (audits.length === 0) return;
-    if (!confirm('WARNING: This will permanently delete ALL local audit history and privacy logs. Proceed?')) return;
+    if (!confirm('WARNING: This will permanently delete ALL local review history. Proceed?')) return;
     try {
       await clearAllHistory();
       setAudits([]);
-      toast.success('All history and privacy logs cleared');
+      toast.success('All history cleared');
     } catch (e) {
       toast.error('Failed to clear records');
       loadAudits();
@@ -57,7 +57,7 @@ export function HistoryPage() {
     return (
       <div className="flex flex-col items-center justify-center py-32 space-y-4">
         <div className="h-10 w-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-        <p className="text-muted-foreground italic">Retrieving secure records...</p>
+        <p className="text-muted-foreground italic">Retrieving education records...</p>
       </div>
     );
   }
@@ -66,8 +66,8 @@ export function HistoryPage() {
       <div className="py-8 md:py-10 lg:py-12 space-y-8 animate-fade-in">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div className="space-y-1">
-            <h1 className="text-4xl font-display font-bold">Audit History</h1>
-            <p className="text-lg text-muted-foreground">Privacy-compliant local billing records.</p>
+            <h1 className="text-4xl font-display font-bold">Review History</h1>
+            <p className="text-lg text-muted-foreground">Historical patient education assistant sessions.</p>
           </div>
           <div className="flex gap-3">
             {audits.length > 0 && (
@@ -76,7 +76,7 @@ export function HistoryPage() {
               </Button>
             )}
             <Button asChild className="rounded-xl">
-              <Link to="/audit">New Audit</Link>
+              <Link to="/audit">New Review</Link>
             </Button>
           </div>
         </div>
@@ -93,7 +93,7 @@ export function HistoryPage() {
           <Card className="border-dashed py-24 text-center rounded-3xl bg-muted/5">
             <CardContent className="flex flex-col items-center gap-6">
               <FileText className="h-12 w-12 text-muted-foreground/30" />
-              <p className="text-xl font-bold">No records found</p>
+              <p className="text-xl font-bold">No sessions found</p>
             </CardContent>
           </Card>
         ) : (
@@ -104,25 +104,24 @@ export function HistoryPage() {
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex gap-1.5">
                       <Badge variant={audit.status === 'clean' ? 'secondary' : 'destructive'} className="px-3">
-                        {audit.status.toUpperCase()}
+                        {audit.status === 'flagged' ? 'REVIEW POINT' : audit.status.toUpperCase()}
                       </Badge>
                       <Badge variant="outline" className="bg-blue-50/50 text-blue-700 border-blue-100 flex items-center gap-1">
                         <Gavel className="h-3 w-3" /> {audit.planType}
                       </Badge>
                     </div>
-                    <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5" />
+                    <span className="text-xs font-medium text-muted-foreground">
                       {format(new Date(audit.date), 'MMM d, yy')}
                     </span>
                   </div>
-                  <CardTitle className="text-xl line-clamp-1 mt-4 group-hover:text-primary transition-colors">
+                  <CardTitle className="text-xl line-clamp-1 mt-4">
                     {audit.fileName}
                   </CardTitle>
                   <CardDescription className="font-bold text-foreground">
-                    ${audit.totalAmount.toLocaleString()} Billed
+                    ${audit.totalAmount.toLocaleString()} Reviewed
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="flex-1 pb-6 space-y-4">
+                <CardContent className="flex-1 pb-6">
                    <div className="space-y-1">
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1">
                       <ShieldCheck className="h-3 w-3" /> Facility
@@ -131,12 +130,7 @@ export function HistoryPage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-between gap-3 border-t bg-muted/20 p-5">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-destructive hover:bg-destructive/10 rounded-xl"
-                    onClick={() => handleDelete(audit.id)}
-                  >
+                  <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 rounded-xl" onClick={() => handleDelete(audit.id)}>
                     <Trash2 className="h-5 w-5" />
                   </Button>
                   <Button variant="outline" size="sm" className="rounded-xl flex-1 h-10" asChild>

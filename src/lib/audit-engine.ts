@@ -5,13 +5,15 @@ import {
   PA_RULES,
   FAIR_BENCHMARKS,
   PLAN_KEYWORDS,
-  PA_VIOLATION_TAXONOMY,
+  PA_REVIEW_TAXONOMY,
   MAX_PAGE_COUNT,
   RuleContext,
   MEDICARE_PROXY_RATIO,
-  ACT_102_REFERENCES
+  ACT_102_REFERENCES,
+  PA_DOI_DISCLAIMER,
+  BENCHMARK_DISCLAIMER
 } from '@/data/constants';
-import { AuditRecord, OverchargeItem, AuditFlag } from './db';
+import { AuditRecord, OverchargeItem, ReviewPoint } from './db';
 import { v4 as uuidv4 } from 'uuid';
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 export async function generateDocumentFingerprint(text: string): Promise<string> {
@@ -102,7 +104,7 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
         if (isSevere) isSevereTotal = true;
         overcharges.push({
           code,
-          description: isSevere ? `Severe Statutory Overcharge (PA Quality Standard)` : `Potential overcharge (Above Medicare Proxy)`,
+          description: isSevere ? `Significant Review Point (PA Quality Standard)` : `Educational Benchmark Check (Above Medicare Proxy)`,
           billedAmount: totalAmount,
           benchmarkAmount: fairVal,
           medicareProxyAmount: medicareProxy,
@@ -114,8 +116,8 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     }
   });
   const ruleCtx: RuleContext = { rawText: text, overcharges, cpt, planType };
-  const rawFlags = PA_RULES.filter(r => r.check(ruleCtx));
-  const flags = await Promise.all(rawFlags.map(async f => {
+  const rawRules = PA_RULES.filter(r => r.check(ruleCtx));
+  const reviewPoints = await Promise.all(rawRules.map(async f => {
     const snippet = text.substring(0, 200).replace(/\n/g, ' ');
     const hash = await computeEvidenceHash(snippet);
     return {
@@ -125,7 +127,7 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
       isSevere: f.severity === 'high' || isSevereTotal,
       taxonomy: {
         rule_id: f.id,
-        statute_ref: PA_VIOLATION_TAXONOMY[f.id] || 'General PA Healthcare Rule',
+        statute_ref: PA_REVIEW_TAXONOMY[f.id] || 'General PA Healthcare Education Note',
         requires_review: f.severity === 'high',
         evidence_hash: hash,
         evidence_snippet: snippet.substring(0, 100)
@@ -143,7 +145,7 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     id: auditId,
     date: new Date().toISOString(),
     fileName,
-    rawText: text,
+    rawText: text, // Caller responsible for memory purge if needed
     redactedText: redacted,
     totalAmount,
     detectedCpt: cpt,
@@ -154,7 +156,7 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     zipCode,
     fingerprint,
     fapEligible: isSevereTotal || planType === 'MEDICAID',
-    legalAuditSummary: isSevereTotal ? "High-risk audit detected severe overcharge violations under PA Act 102." : "Standard audit completed.",
+    legalAuditSummary: isSevereTotal ? "Educational review points detected high-risk billing patterns under PA Act 102." : "Standard educational review completed.",
     extractedData: {
       providerName,
       dateOfService: dates[dates.length - 1] || dates[0] || '',
@@ -163,30 +165,36 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
       policyId: policy ? policy[1] : ''
     },
     overcharges,
-    flags,
-    status: flags.length > 0 ? 'flagged' : 'clean'
+    reviewPoints,
+    status: reviewPoints.length > 0 ? 'flagged' : 'clean'
   };
 }
 export function exportLegalAuditPackage(audit: AuditRecord) {
   return JSON.stringify({
     metadata: {
-      audit_id: audit.id,
+      review_id: audit.id,
       fingerprint: audit.fingerprint,
       timestamp: new Date().toISOString(),
-      statutory_basis: "PA Act 102 & No Surprises Act"
+      statutory_basis: "PA Act 102 & No Surprises Act",
+      regulatory_notice: PA_DOI_DISCLAIMER,
+      benchmark_notice: BENCHMARK_DISCLAIMER,
+      ethics_statement: "This analysis is produced by a non-legal assistant tool for patient education. Only redacted data is preserved in this package."
     },
     summary: audit.legalAuditSummary,
-    flags: audit.flags.map(f => ({
-      code: f.taxonomy?.rule_id,
-      statute: f.taxonomy?.statute_ref,
-      severity: f.severity,
-      snippet: f.taxonomy?.evidence_snippet
+    review_points: audit.reviewPoints.map(p => ({
+      code: p.taxonomy?.rule_id,
+      statute: p.taxonomy?.statute_ref,
+      severity: p.severity,
+      integrity_hash: p.taxonomy?.evidence_hash
     })),
     remediation: {
+      pa_doi_hotline: "1-877-881-6388",
       pa_doh_hotline: "1-800-254-5164",
       fap_eligible: audit.fapEligible,
-      itemization_required: true
+      itemization_required: true,
+      next_steps: "Contact your carrier or the PA DOI portal for formal dispute resolution."
     },
-    disclaimer: "This document is an automated audit report and does not constitute legal counsel."
+    redacted_content: audit.redactedText,
+    disclaimer: "This document is an automated education report and does not constitute legal counsel."
   }, null, 2);
 }

@@ -9,7 +9,7 @@ export interface OverchargeItem {
   legalCitation?: string;
   statutoryReference?: string;
 }
-export interface AuditFlag {
+export interface ReviewPoint {
   type: string;
   severity: 'low' | 'medium' | 'high';
   description: string;
@@ -26,7 +26,7 @@ export interface AuditRecord {
   id: string;
   date: string;
   fileName: string;
-  rawText: string;
+  rawText: string | null; // Nullable for memory purge
   redactedText: string;
   totalAmount: number;
   detectedCpt: string[];
@@ -48,7 +48,7 @@ export interface AuditRecord {
     allDates?: string[];
   };
   overcharges: OverchargeItem[];
-  flags: AuditFlag[];
+  reviewPoints: ReviewPoint[];
   status: 'completed' | 'flagged' | 'clean';
 }
 export interface InsuranceFilingRecord {
@@ -57,7 +57,7 @@ export interface InsuranceFilingRecord {
   fileName: string;
   fileType: 'PDF' | 'XLSX';
   status: 'ingesting' | 'analyzing_rates' | 'indexed' | 'flagged';
-  flags: AuditFlag[];
+  reviewPoints: ReviewPoint[];
   extractedData: {
     companyName?: string;
     planYear?: string;
@@ -80,7 +80,7 @@ const DB_NAME = 'billguard-pa-db';
 const STORE_NAME = 'audits';
 const FILINGS_STORE = 'insurance_filings';
 const REDACTION_STORE = 'redaction_audits';
-const DB_VERSION = 8;
+const DB_VERSION = 9; // Incremented for schema changes
 let dbPromise: Promise<IDBPDatabase> | null = null;
 function getDB() {
   if (!dbPromise) {

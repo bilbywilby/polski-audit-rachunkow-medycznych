@@ -4,9 +4,10 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Toaster } from "@/components/ui/sonner";
-import { ShieldCheck, Lock } from "lucide-react";
+import { ShieldCheck, Lock, Gavel, ExternalLink } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLanguage } from "@/hooks/use-language";
+import { PA_DOI_HOTLINE, PA_DOI_DISCLAIMER, PA_DOI_PORTAL_URL } from "@/data/constants";
 export function MainLayout(): JSX.Element {
   const { t } = useLanguage();
   return (
@@ -38,25 +39,39 @@ export function MainLayout(): JSX.Element {
             <Outlet />
           </div>
         </main>
-        <footer className="border-t bg-muted/30 py-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
-            <div className="space-y-3">
-              <p className="text-sm font-bold text-foreground flex items-center justify-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-blue-600" /> HIPAA-Friendly Privacy Model
-              </p>
-              <p className="text-xs text-muted-foreground italic max-w-2xl mx-auto leading-relaxed">
-                {t('footer.privacy')}
-              </p>
+        <footer className="border-t bg-muted/30 py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
+              <div className="space-y-4">
+                <p className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-blue-600" /> Patient Education Assistant
+                </p>
+                <p className="text-xs text-muted-foreground italic leading-relaxed">
+                  {t('footer.privacy')}
+                </p>
+                <div className="flex items-center gap-4 text-[10px] text-muted-foreground uppercase font-bold tracking-widest opacity-60">
+                  <span className="bg-muted px-2 py-1 rounded border">Act 102 Reference Tool</span>
+                  <span>•</span>
+                  <span className="bg-muted px-2 py-1 rounded border">Education Only</span>
+                </div>
+              </div>
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-border shadow-sm space-y-4">
+                <div className="flex items-center gap-2 text-primary font-bold text-sm">
+                  <Gavel className="h-4 w-4" /> Regulatory Information
+                </div>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  {PA_DOI_DISCLAIMER}
+                </p>
+                <div className="pt-4 border-t flex flex-wrap gap-4 items-center">
+                  <p className="text-xs font-bold">PA DOI Helpline: <a href={`tel:${PA_DOI_HOTLINE}`} className="text-primary hover:underline">{PA_DOI_HOTLINE}</a></p>
+                  <a href={PA_DOI_PORTAL_URL} target="_blank" rel="noreferrer" className="text-xs text-primary font-bold hover:underline flex items-center gap-1">
+                    Visit official DOI portal <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
             </div>
-            <div className="flex justify-center flex-wrap items-center gap-4 text-[10px] text-muted-foreground uppercase font-bold tracking-widest opacity-60">
-              <span className="bg-muted px-2 py-1 rounded border">PA Act 102 Compliant</span>
-              <span>•</span>
-              <span className="bg-muted px-2 py-1 rounded border">No Surprises Act Ready</span>
-              <span>•</span>
-              <span className="bg-muted px-2 py-1 rounded border">100% Local-First Audit</span>
-            </div>
-            <p className="text-[10px] text-muted-foreground/40 max-w-md mx-auto">
-              Disclaimer: BillGuard PA is a diagnostic tool and does not constitute legal or financial advice.
+            <p className="text-[10px] text-muted-foreground/40 text-center">
+              Disclaimer: BillGuard PA is a diagnostic education tool and does not constitute legal or financial advice. All analysis is for patient guidance only.
             </p>
           </div>
         </footer>

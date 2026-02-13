@@ -3,6 +3,10 @@ export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 export const MAX_PAGE_COUNT = 50;
 export const MEDICARE_PROXY_RATIO = 0.72;
 export const PA_DOH_HOTLINE = "1-800-254-5164";
+export const PA_DOI_HOTLINE = "1-877-881-6388";
+export const PA_DOI_PORTAL_URL = "https://www.insurance.pa.gov/nosurprises";
+export const PA_DOI_DISCLAIMER = "This tool is for educational purposes only and does not constitute legal or financial advice. For formal disputes, contact your insurer or the PA Department of Insurance (DOI) at 1-877-881-6388.";
+export const BENCHMARK_DISCLAIMER = "Benchmarks are illustrative estimates based on Medicare proxy data (0.72 ratio) and may not reflect actual insurer-allowed amounts.";
 export interface RuleContext {
   rawText: string;
   overcharges: any[];
@@ -18,12 +22,12 @@ export const ACT_102_REFERENCES = {
   SECTION_5: {
     title: "PA Act 102 § 5: Billing Accuracy Standards",
     description: "Bills must accurately reflect the services rendered. Overcharging or billing for services not provided violates state quality standards.",
-    remedy: "Audit line items against medical records for upcoding."
+    remedy: "Review line items against medical records for upcoding."
   },
   SECTION_7: {
     title: "PA Act 102 § 7: Emergency Care Protections",
     description: "Limits liability for patients receiving emergency care, preventing predatory out-of-network 'surprise' charges.",
-    remedy: "Dispute via the No Surprises Act federal portal and PA DOH."
+    remedy: "Dispute via the No Surprises Act federal portal and PA DOI."
   }
 };
 export const PA_FACILITY_OBLIGATIONS = [
@@ -65,7 +69,7 @@ export const PA_RESOURCES: Record<Language, { name: string; description: string;
     { name: "Prokurator Generalny PA", description: "Chroni konsumentów przed nieuczciwymi praktykami biznesowymi, w tym drapieżnym fakturowaniem.", url: "https://www.attorneygeneral.gov/" }
   ]
 };
-export const PA_VIOLATION_TAXONOMY: Record<string, string> = {
+export const PA_REVIEW_TAXONOMY: Record<string, string> = {
   'balance-billing': 'No Surprises Act - 42 U.S.C. § 300gg-111',
   'act-102-triad': 'PA Act 102 § 3 (Right to Itemized Bill / Emergency Protections)',
   'act-102-billing-error': 'PA Act 102 § 5 (Accuracy Standards)',
@@ -95,7 +99,7 @@ export const PA_RULES = [
   },
   {
     id: 'act-102-triad',
-    name: 'Act 102 Triad Violation',
+    name: 'Act 102 Triad Review Point',
     description: 'Bill contains Emergency services at a Facility with indications of non-participating status.',
     severity: 'high' as const,
     check: (ctx: RuleContext) => {
@@ -124,7 +128,7 @@ export const LETTER_TEMPLATES: Record<Language, { id: string; name: string; desc
     },
     {
       id: "nsa-violation",
-      name: "No Surprises Act Violation Dispute",
+      name: "No Surprises Act Dispute",
       description: "Dispute out-of-network charges for emergency services.",
       body: "To: Billing Department\nRe: Dispute of Out-of-Network Charges (No Surprises Act)\n\nI am formally disputing the bill for services on {SERVICE_DATE} at {PROVIDER_NAME}. As these were emergency services, federal law (42 U.S.C. § 300gg-111) and Pennsylvania Act 102 prohibit balance billing. My responsibility is limited to in-network cost-sharing amounts. I request a re-adjudication of this claim based on these protections."
     }
