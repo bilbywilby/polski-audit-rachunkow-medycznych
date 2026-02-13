@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllAudits, deleteAudit, AuditRecord } from '@/lib/db';
+import { getAllAudits, deleteAudit, AuditRecord, saveAudit } from '@/lib/db';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Calendar, FileText, Trash2, ArrowUpRight, Search, TrendingUp, ShieldCheck } from 'lucide-react';
+import { Calendar, FileText, Trash2, ArrowUpRight, Search, ShieldCheck, Eraser, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -17,7 +17,6 @@ export function HistoryPage() {
       const data = await getAllAudits();
       setAudits(data);
     } catch (e) {
-      console.error(e);
       toast.error('Failed to load history');
     } finally {
       setLoading(false);
@@ -31,20 +30,32 @@ export function HistoryPage() {
     try {
       await deleteAudit(id);
       setAudits(prev => prev.filter(a => a.id !== id));
-      toast.success('Record deleted');
+      toast.success('Record deleted locally');
     } catch (e) {
-      console.error(e);
-      toast.error('Failed to delete audit');
+      toast.error('Failed to delete record');
+    }
+  };
+  const handleClearAll = async () => {
+    if (audits.length === 0) return;
+    if (!confirm('WARNING: This will permanently delete ALL local audit history. This action cannot be undone. Proceed?')) return;
+    if (!confirm('FINAL CONFIRMATION: Are you absolutely sure?')) return;
+    try {
+      for (const audit of audits) {
+        await deleteAudit(audit.id);
+      }
+      setAudits([]);
+      toast.success('All history cleared');
+    } catch (e) {
+      toast.error('Failed to clear some records');
+      loadAudits();
     }
   };
   const filteredAudits = useMemo(() => {
-    return audits.filter(a => 
-      a.fileName.toLowerCase().includes(searchTerm.toLowerCase())
+    return audits.filter(a =>
+      a.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.extractedData.providerName?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [audits, searchTerm]);
-  const totalFlaggedAmount = useMemo(() => {
-    return audits.reduce((sum, a) => a.status !== 'clean' ? sum + a.totalAmount : sum, 0);
-  }, [audits]);
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-32 space-y-4">
@@ -59,66 +70,38 @@ export function HistoryPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div className="space-y-1">
             <h1 className="text-4xl font-display font-bold">Audit History</h1>
-            <p className="text-lg text-muted-foreground">Manage your past scans and dispute findings.</p>
+            <p className="text-lg text-muted-foreground">Your locally stored medical billing audits.</p>
           </div>
-          <Button asChild size="lg" className="rounded-xl">
-            <Link to="/audit">New Audit</Link>
-          </Button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-primary text-primary-foreground border-none">
-            <CardContent className="pt-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm font-medium opacity-80 uppercase tracking-wider">Total Scanned</p>
-                  <p className="text-3xl font-bold mt-1">${audits.reduce((s, a) => s + a.totalAmount, 0).toLocaleString()}</p>
-                </div>
-                <FileText className="h-8 w-8 opacity-20" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-amber-500 text-white border-none">
-            <CardContent className="pt-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm font-medium opacity-80 uppercase tracking-wider">Potential Savings</p>
-                  <p className="text-3xl font-bold mt-1">${totalFlaggedAmount.toLocaleString()}</p>
-                </div>
-                <TrendingUp className="h-8 w-8 opacity-20" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-green-500 text-white border-none">
-            <CardContent className="pt-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm font-medium opacity-80 uppercase tracking-wider">Active Disputes</p>
-                  <p className="text-3xl font-bold mt-1">{audits.filter(a => a.status === 'flagged').length}</p>
-                </div>
-                <ShieldCheck className="h-8 w-8 opacity-20" />
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex gap-3">
+            {audits.length > 0 && (
+              <Button variant="outline" onClick={handleClearAll} className="rounded-xl border-destructive/30 text-destructive hover:bg-destructive/5">
+                <Eraser className="mr-2 h-4 w-4" /> Clear All
+              </Button>
+            )}
+            <Button asChild className="rounded-xl">
+              <Link to="/audit">New Audit</Link>
+            </Button>
+          </div>
         </div>
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input 
-            placeholder="Search by filename..." 
+          <Input
+            placeholder="Search filename or provider..."
             className="pl-10 h-12 rounded-xl"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         {filteredAudits.length === 0 ? (
-          <Card className="border-dashed py-24 text-center rounded-3xl">
+          <Card className="border-dashed py-24 text-center rounded-3xl bg-muted/5">
             <CardContent className="flex flex-col items-center gap-6">
               <div className="p-6 bg-muted rounded-full">
-                <Search className="h-12 w-12 text-muted-foreground/30" />
+                <FileText className="h-12 w-12 text-muted-foreground/30" />
               </div>
               <div className="space-y-2">
                 <p className="text-2xl font-bold">No records found</p>
                 <p className="text-muted-foreground max-w-xs mx-auto">
-                  {searchTerm ? `No audits match "${searchTerm}"` : "You haven't performed any audits yet."}
+                  {searchTerm ? `No audits match "${searchTerm}"` : "Secure your first medical bill by starting a new audit today."}
                 </p>
               </div>
               {!searchTerm && (
@@ -131,11 +114,11 @@ export function HistoryPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredAudits.map((audit) => (
-              <Card key={audit.id} className="group hover:shadow-xl transition-all duration-300 rounded-3xl border-muted/60 flex flex-col">
+              <Card key={audit.id} className="group hover:shadow-xl transition-all duration-300 rounded-3xl border-muted/60 flex flex-col overflow-hidden">
                 <CardHeader className="pb-4">
                   <div className="flex justify-between items-start gap-2">
-                    <Badge 
-                      variant={audit.status === 'clean' ? 'secondary' : 'destructive'} 
+                    <Badge
+                      variant={audit.status === 'clean' ? 'secondary' : 'destructive'}
                       className={`px-3 ${audit.status === 'clean' ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}`}
                     >
                       {audit.status.toUpperCase()}
@@ -145,26 +128,22 @@ export function HistoryPage() {
                       {format(new Date(audit.date), 'MMM d, yyyy')}
                     </span>
                   </div>
-                  <CardTitle className="text-xl line-clamp-1 mt-4 flex items-center gap-2 group-hover:text-primary transition-colors">
-                    <FileText className="h-5 w-5 text-muted-foreground" />
+                  <CardTitle className="text-xl line-clamp-1 mt-4 group-hover:text-primary transition-colors">
                     {audit.fileName}
                   </CardTitle>
-                  <CardDescription className="text-base font-semibold text-foreground">
-                    ${audit.totalAmount.toLocaleString()} detected
+                  <CardDescription className="font-bold text-foreground">
+                    ${audit.totalAmount.toLocaleString()} Billed
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="flex-1 pb-6">
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {audit.flags.length > 0 
-                      ? `${audit.flags.length} issue${audit.flags.length !== 1 ? 's' : ''} require attention.` 
-                      : "Clean bill: No automatic flags detected."}
-                  </p>
+                <CardContent className="flex-1 pb-6 space-y-2">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Provider</p>
+                  <p className="text-sm font-medium line-clamp-1 italic">{audit.extractedData.providerName || 'N/A'}</p>
                 </CardContent>
-                <CardFooter className="flex justify-between gap-3 border-t bg-muted/20 p-5 rounded-b-3xl">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
+                <CardFooter className="flex justify-between gap-3 border-t bg-muted/20 p-5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:bg-destructive/10 rounded-xl"
                     onClick={() => handleDelete(audit.id)}
                   >
                     <Trash2 className="h-5 w-5" />

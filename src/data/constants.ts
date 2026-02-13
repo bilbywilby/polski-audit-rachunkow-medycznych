@@ -26,8 +26,9 @@ export const CODE_PATTERNS = {
   hcpcs: /\b[A-Z]\d{4}[A-Z]?\b/g,
   revenue: /\b(0\d{3}|[1-9]\d{3})\b/g,
   npi: /\b[1-9]\d{9}\b/g,
-  amounts: /\$\d+(,\d{3})*(\.\d{2})?/g,
-  policy: /\b(Group|Policy|ID|Member)\s*(?:#|No\.?)?\s*([A-Z0-9-]{6,15})\b/i,
+  amounts: /\$\s?\d+(?:,\d{3})*(?:\.\d{2})?\b/g,
+  policy: /\b(?:Group|Policy|ID|Member)\s*(?:#|No\.?)?\s*([A-Z0-9-]{6,15})\b/i,
+  account: /\b(?:Account|Invoice|Bill|Statement)\s*(?:#|No\.?)?\s*([A-Z0-9-]{5,20})\b/i,
   date: /\b(0?[1-9]|1[012])[- /.](0?[1-9]|[12][0-9]|3[01])[- /.](19|20)\d\d\b/g
 };
 export const REDACTION_PATTERNS = {
@@ -88,68 +89,43 @@ export const PA_RULES = [
     description: 'A high volume of procedural codes suggests a single surgery may have been broken into multiple charges.',
     severity: 'high' as const,
     check: (ctx: RuleContext) => ctx.codes.length > 8
-  },
-  {
-    id: 'clerical',
-    name: 'Clerical/Coding Linkage',
-    description: 'Procedures found without corresponding ICD-10 diagnostic codes. This mismatch can be used to dispute bill validity.',
-    severity: 'low' as const,
-    check: (ctx: RuleContext) => {
-      const hasCpt = ctx.codes.some(c => /^\d{5}$/.test(c));
-      const hasIcd = ctx.rawText.match(/\b[A-TV-Z]\d{2}[A-Z0-9]\b/);
-      return hasCpt && !hasIcd;
-    }
-  },
-  {
-    id: 'duplicate-billing',
-    name: 'Duplicate Billing',
-    description: 'The same procedure code appears multiple times. This may be a clerical error causing double-charging.',
-    severity: 'medium' as const,
-    check: (ctx: RuleContext) => new Set(ctx.codes).size !== ctx.codes.length
-  },
-  {
-    id: 'missing-policy',
-    name: 'Missing Insurance Context',
-    description: 'No insurance policy or group ID was found on this statement. Hospitals may be billing at higher self-pay rates.',
-    severity: 'low' as const,
-    check: (ctx: RuleContext) => !/Policy|Group|ID|Member/i.test(ctx.rawText)
   }
 ];
 export const LETTER_TEMPLATES = [
   {
-    id: "general-dispute",
-    name: "General Billing Dispute",
-    description: "Standard template for disputing incorrect charges or clerical errors.",
-    body: "I am writing to formally dispute charges for services on [DATE_OF_SERVICE]. My audit indicates specific coding levels do not reflect the complexity of the visit. I request an itemized bill with CPT and ICD-10 codes for total amount $[TOTAL_AMOUNT]. [OVERCHARGES_SUMMARY]"
+    id: "itemized-request",
+    name: "Itemized Bill Demand",
+    description: "Legal demand for a full breakdown of every service provided to ensure transparency.",
+    body: "I am writing to formally request a complete itemized bill for services rendered by {PROVIDER_NAME} on {SERVICE_DATE}. Pursuant to my rights as a patient, this bill must include all Revenue Codes, CPT/HCPCS codes, and NPI identifiers for all billing providers associated with Account #{ACCOUNT_NUMBER}. I require this documentation to verify the accuracy of the charges totaling {TOTAL_AMOUNT}."
   },
   {
-    id: "surprise-bill",
-    name: "No Surprises Act Violation",
-    description: "For out-of-network emergency care or non-consented provider charges.",
-    body: "This bill for $[TOTAL_AMOUNT] appears to violate the No Surprises Act. As I received emergency care on [DATE_LIST], I am only responsible for my in-network cost-sharing amount. Please adjust the balance accordingly."
+    id: "surprise-dispute",
+    name: "General Surprise Dispute",
+    description: "Dispute unexpected charges or billing inaccuracies based on Pennsylvania benchmarks.",
+    body: "I am formally disputing the bill from {PROVIDER_NAME} for services on {SERVICE_DATE}. My internal audit indicates that the charges listed ({TOTAL_AMOUNT}) are inconsistent with regional cost expectations for the following codes: {CODE_LIST}. Specifically: {BENCHMARK_COMPARISON}. I request a review of these charges and an adjustment based on {POLICY_INFO}."
   },
   {
-    id: "financial-assistance",
-    name: "Charity Care Request",
-    description: "Application for hospital financial assistance based on income (HCAP).",
-    body: "I am requesting an application for Financial Assistance (Charity Care) as per PA Act 32. My bill for $[TOTAL_AMOUNT] represents a significant hardship. Please send the necessary forms to [PATIENT_NAME]."
+    id: "financial-aid",
+    name: "Financial Assistance Request",
+    description: "Application for charity care or financial aid under PA Act 32 protections.",
+    body: "Regarding Account #{ACCOUNT_NUMBER} for {TOTAL_AMOUNT}, I am requesting an application for Financial Assistance (Charity Care) as per PA Act 32. Due to financial hardship, I request a review of my eligibility for HCAP or other hospital assistance programs for services provided on {SERVICE_DATE} by {PROVIDER_NAME}."
   },
   {
     id: "coding-audit",
-    name: "Coding Audit Request",
-    description: "Request for a formal coding review when upcoding or unbundling is suspected.",
-    body: "My audit of bill #[ACCOUNT_NUMBER] detected potential coding errors involving codes [CPT_CODES]. These services occurred on [DATE_LIST]. I request a formal review of these charges against NCCI edits."
+    name: "Formal Coding Audit",
+    description: "Technical request for a review of specific CPT codes to check for upcoding or unbundling.",
+    body: "I am requesting a formal coding audit of my bill from {PROVIDER_NAME} dated {SERVICE_DATE}. My audit detected potential coding anomalies involving CPT codes {CODE_LIST}. Specifically, I am concerned about potential upcoding for Account #{ACCOUNT_NUMBER}. Please provide a written explanation of how these codes were selected based on the clinical documentation."
   },
   {
-    id: "payment-plan",
-    name: "Payment Plan Proposal",
-    description: "A formal request to break down a large bill into manageable monthly payments.",
-    body: "Regarding my bill for $[TOTAL_AMOUNT], I am requesting a formal payment plan. I can commit to monthly payments of $[MONTHLY_PAYMENT] starting [START_DATE]. Please confirm if this is acceptable."
+    id: "payment-negotiation",
+    name: "Payment Plan Negotiation",
+    description: "Proposal for a structured payment plan based on a manageable monthly amount.",
+    body: "Regarding my balance of {TOTAL_AMOUNT} with {PROVIDER_NAME}, I would like to propose a formal payment plan. Given my current financial situation, I can commit to monthly payments toward Account #{ACCOUNT_NUMBER} for the services on {SERVICE_DATE}. Please confirm if you will accept this negotiation based on my {POLICY_INFO}."
   },
   {
-    id: "itemized-request",
-    name: "Itemized Bill Demand",
-    description: "Legal demand for a full breakdown of every service provided.",
-    body: "I formally request a complete itemized bill for services rendered by [PROVIDER_NAME] on [DATE_OF_SERVICE]. The bill must include Revenue Codes, CPT/HCPCS codes, and NPI identifiers for all billing providers."
+    id: "no-surprises-act",
+    name: "No Surprises Act Protection",
+    description: "Federal protection dispute for out-of-network emergency or non-consented services.",
+    body: "This bill for {TOTAL_AMOUNT} appears to violate the No Surprises Act. On {SERVICE_DATE}, I received emergency care at {PROVIDER_NAME}. Under federal law, I am only responsible for my in-network cost-sharing amount. Please adjust Account #{ACCOUNT_NUMBER} to reflect {POLICY_INFO} and cease any collection efforts for the balance billing portion."
   }
 ];

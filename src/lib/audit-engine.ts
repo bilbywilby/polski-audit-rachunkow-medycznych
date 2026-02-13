@@ -29,49 +29,54 @@ function redactSensitiveData(text: string): string {
   });
   return redacted;
 }
-export async function analyzeBillText(text: string, fileName: string): Promise<AuditRecord> {
-  const redactedText = redactSensitiveData(text);
-  // Extract Codes
-  const cptMatches = text.match(CODE_PATTERNS.cpt) || [];
-  const icdMatches = text.match(CODE_PATTERNS.icd10) || [];
-  const hcpcsMatches = text.match(CODE_PATTERNS.hcpcs) || [];
-  const revenueMatches = text.match(CODE_PATTERNS.revenue) || [];
-  const npiMatches = text.match(CODE_PATTERNS.npi) || [];
-  const amountsMatches = text.match(CODE_PATTERNS.amounts) || [];
-  // Extract Metadata
+function extractSmartData(text: string) {
   const dateMatches = text.match(CODE_PATTERNS.date) || [];
   const policyMatch = text.match(CODE_PATTERNS.policy);
-  // Basic provider name extraction (heuristic)
+  const accountMatch = text.match(CODE_PATTERNS.account);
+  // Heuristic: The earliest date is often the service date, latest is bill date
+  const sortedDates = [...new Set(dateMatches)].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+  // Provider Extraction: Look for hospital keywords in first 20 lines
   let providerName = '';
-  const providerKeywords = ['Hospital', 'Clinic', 'Medical Center', 'Health', 'Specialists'];
+  const providerKeywords = ['Hospital', 'Clinic', 'Medical Center', 'Health', 'Specialists', 'Physicians', 'Surgery Center'];
   const lines = text.split('\n');
-  for (const line of lines.slice(0, 15)) {
-    if (providerKeywords.some(kw => line.includes(kw))) {
+  for (const line of lines.slice(0, 20)) {
+    if (providerKeywords.some(kw => line.toLowerCase().includes(kw.toLowerCase()))) {
       providerName = line.trim();
       break;
     }
   }
-  const uniqueCpt = Array.from(new Set(cptMatches));
-  const uniqueIcd = Array.from(new Set(icdMatches));
-  const uniqueHcpcs = Array.from(new Set(hcpcsMatches));
-  const uniqueRevenue = Array.from(new Set(revenueMatches));
-  const uniqueNpi = Array.from(new Set(npiMatches));
+  return {
+    providerName: providerName || 'Not Detected',
+    serviceDate: sortedDates[0] || '',
+    billDate: sortedDates[sortedDates.length - 1] || '',
+    policyId: policyMatch ? policyMatch[1] : '',
+    accountNumber: accountMatch ? accountMatch[1] : '',
+    allDates: sortedDates
+  };
+}
+export async function analyzeBillText(text: string, fileName: string): Promise<AuditRecord> {
+  const redactedText = redactSensitiveData(text);
+  const smartData = extractSmartData(text);
+  // Extract Codes
+  const cptMatches = Array.from(new Set(text.match(CODE_PATTERNS.cpt) || []));
+  const icdMatches = Array.from(new Set(text.match(CODE_PATTERNS.icd10) || []));
+  const hcpcsMatches = Array.from(new Set(text.match(CODE_PATTERNS.hcpcs) || []));
+  const revenueMatches = Array.from(new Set(text.match(CODE_PATTERNS.revenue) || []));
+  const npiMatches = Array.from(new Set(text.match(CODE_PATTERNS.npi) || []));
+  const amountsMatches = text.match(CODE_PATTERNS.amounts) || [];
   const amounts = amountsMatches.map(m => parseFloat(m.replace(/[$,\s]/g, ''))).filter(n => !isNaN(n));
   const totalAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
   // Benchmark Calculation
   const overcharges: OverchargeItem[] = [];
-  uniqueCpt.forEach(code => {
+  cptMatches.forEach(code => {
     const benchmark = PA_COST_BENCHMARKS.find(b => b.code === code);
     if (benchmark) {
-      // Very simple inference: if total bill is high and this code is present, 
-      // check if it's statistically likely to be an overcharge.
-      // In a real app, we'd extract the specific line item cost.
-      // For this demo, we assume the highest amount match might be this code if only 1 code exists.
-      if (uniqueCpt.length === 1 && totalAmount > benchmark.avgCost * 1.25) {
+      // Logic: If this is a primary code and total bill is significantly higher than benchmark
+      if (totalAmount > benchmark.avgCost * 1.15) {
         overcharges.push({
           code,
           description: benchmark.description,
-          billedAmount: totalAmount,
+          billedAmount: totalAmount, // For demo, we assume the high bill is driven by this code
           benchmarkAmount: benchmark.avgCost,
           percentOver: Math.round(((totalAmount - benchmark.avgCost) / benchmark.avgCost) * 100)
         });
@@ -79,7 +84,7 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     }
   });
   const ruleCtx = { rawText: text, codes: cptMatches, overcharges };
-  const flags: AuditRecord['flags'] = PA_RULES
+  const flags = PA_RULES
     .filter(rule => rule.check(ruleCtx))
     .map(rule => ({
       type: rule.id,
@@ -93,19 +98,21 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     rawText: text,
     redactedText,
     totalAmount,
-    detectedCpt: uniqueCpt,
-    detectedIcd: uniqueIcd,
-    detectedHcpcs: uniqueHcpcs,
-    detectedRevenue: uniqueRevenue,
-    detectedNpi: uniqueNpi,
+    detectedCpt: cptMatches,
+    detectedIcd: icdMatches,
+    detectedHcpcs: hcpcsMatches,
+    detectedRevenue: revenueMatches,
+    detectedNpi: npiMatches,
     extractedData: {
-      providerName,
-      dateOfService: dateMatches[0] || '',
-      policyId: policyMatch ? policyMatch[2] : '',
-      allDates: Array.from(new Set(dateMatches))
+      providerName: smartData.providerName,
+      dateOfService: smartData.serviceDate,
+      billDate: smartData.billDate,
+      policyId: smartData.policyId,
+      accountNumber: smartData.accountNumber,
+      allDates: smartData.allDates
     },
     overcharges,
     flags,
-    status: flags.length > 0 ? 'flagged' : 'clean'
+    status: flags.length > 0 ? 'flagged' : (overcharges.length > 0 ? 'flagged' : 'clean')
   };
 }
