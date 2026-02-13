@@ -3,10 +3,10 @@ import * as XLSX from 'xlsx';
 import {
   INSURANCE_PATTERNS,
   PLAN_KEYWORDS,
-  PA_VIOLATION_TAXONOMY,
+  PA_REVIEW_TAXONOMY,
   REDACTION_PATTERNS
 } from '@/data/constants';
-import { InsuranceFilingRecord, AuditFlag } from './db';
+import { InsuranceFilingRecord, ReviewPoint } from './db';
 import * as pdfjs from 'pdfjs-dist';
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 export async function extractTextFromFiling(file: File): Promise<string> {
@@ -41,7 +41,7 @@ function redactFilingText(text: string): string {
 }
 export async function analyzeInsuranceFiling(text: string, fileName: string): Promise<InsuranceFilingRecord> {
   let carrier = 'Unknown Carrier';
-  for (const [key, keywords] of Object.entries(PLAN_KEYWORDS)) {
+  for (const [_, keywords] of Object.entries(PLAN_KEYWORDS)) {
     const found = keywords.find(k => {
       const escapedKeyword = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
@@ -69,15 +69,15 @@ export async function analyzeInsuranceFiling(text: string, fileName: string): Pr
       countyPricing[county] = parseFloat(match[1]);
     }
   });
-  const flags: AuditFlag[] = [];
+  const reviewPoints: ReviewPoint[] = [];
   if (rateHikeVal > 15) {
-    flags.push({
+    reviewPoints.push({
       type: 'excessive-rate-hike',
       severity: 'high',
       description: `Requested rate hike of ${rateHike} exceeds the 15% transparency threshold set by PA PID.`,
       taxonomy: {
         rule_id: 'excessive-rate-hike',
-        statute_ref: PA_VIOLATION_TAXONOMY['excessive-rate-hike'],
+        statute_ref: PA_REVIEW_TAXONOMY['excessive-rate-hike'] || 'PA PID Review Standard',
         requires_review: true,
         evidence_hash: '',
         evidence_snippet: `Detected hike: ${rateHike}`
@@ -85,13 +85,13 @@ export async function analyzeInsuranceFiling(text: string, fileName: string): Pr
     });
   }
   if (mlrVal < 80) {
-    flags.push({
+    reviewPoints.push({
       type: 'mlr-non-compliance',
       severity: 'medium',
       description: `Medical Loss Ratio (${mlrPercent}) appears to be below the ACA 80/20 requirement for commercial plans.`,
       taxonomy: {
         rule_id: 'mlr-non-compliance',
-        statute_ref: PA_VIOLATION_TAXONOMY['mlr-non-compliance'],
+        statute_ref: PA_REVIEW_TAXONOMY['mlr-non-compliance'] || 'ACA MLR Standard',
         requires_review: false,
         evidence_hash: '',
         evidence_snippet: `Detected MLR: ${mlrPercent}`
@@ -103,8 +103,8 @@ export async function analyzeInsuranceFiling(text: string, fileName: string): Pr
     date: new Date().toISOString(),
     fileName,
     fileType: fileName.toLowerCase().endsWith('.xlsx') ? 'XLSX' : 'PDF',
-    status: flags.some(f => f.severity === 'high') ? 'flagged' : 'indexed',
-    flags,
+    status: reviewPoints.some(f => f.severity === 'high') ? 'flagged' : 'indexed',
+    reviewPoints,
     extractedData: {
       companyName: carrier,
       planYear: (text.match(/\b202[456]\b/) || ['2025'])[0],

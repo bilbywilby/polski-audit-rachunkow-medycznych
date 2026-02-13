@@ -40,11 +40,11 @@ export function DashboardPage() {
   const pieData = useMemo(() => {
     const counts: Record<string, number> = {};
     audits.forEach(a => {
-      a.flags.forEach(f => {
+      a.reviewPoints?.forEach(f => {
         counts[f.type] = (counts[f.type] || 0) + 1;
       });
     });
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+    return Object.entries(counts).map(([name, value]) => ({ name: name.replace(/-/g, ' '), value }));
   }, [audits]);
   const COLORS = ['#2563EB', '#F59E0B', '#EF4444', '#10B981', '#8B5CF6'];
   return (
@@ -109,7 +109,7 @@ export function DashboardPage() {
         <Card className="rounded-3xl border-muted/50 shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl font-bold">Issue Distribution</CardTitle>
-            <CardDescription>Frequency of different violation types detected</CardDescription>
+            <CardDescription>Frequency of different review points detected</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
             {pieData.length > 0 ? (

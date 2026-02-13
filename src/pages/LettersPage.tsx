@@ -55,10 +55,10 @@ export function LettersPage() {
       '{TOTAL_AMOUNT}': form.amount || '[TOTAL]'
     };
     Object.entries(map).forEach(([k, v]) => { body = body.split(k).join(v); });
-    if (includeCitations && audit?.flags.length) {
-      body += "\n\nSTUTORY COMPLIANCE NOTES:";
-      audit.flags.forEach(f => {
-        body += `\n- Potential Violation: ${f.type.toUpperCase()} (Ref: ${f.taxonomy?.statute_ref})`;
+    if (includeCitations && audit?.reviewPoints && audit.reviewPoints.length > 0) {
+      body += "\n\nSTATUTORY COMPLIANCE NOTES:";
+      audit.reviewPoints.forEach(f => {
+        body += `\n- Education Point: ${f.type.toUpperCase().replace(/-/g, ' ')} (Ref: ${f.taxonomy?.statute_ref})`;
       });
     }
     if (audit?.fapEligible) {

@@ -127,7 +127,7 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
       isSevere: f.severity === 'high' || isSevereTotal,
       taxonomy: {
         rule_id: f.id,
-        statute_ref: PA_REVIEW_TAXONOMY[f.id] || 'General PA Healthcare Education Note',
+        statute_ref: PA_REVIEW_TAXONOMY[f.id] || 'PA Act 102 Quality Standards',
         requires_review: f.severity === 'high',
         evidence_hash: hash,
         evidence_snippet: snippet.substring(0, 100)
@@ -175,7 +175,7 @@ export function exportLegalAuditPackage(audit: AuditRecord) {
       review_id: audit.id,
       fingerprint: audit.fingerprint,
       timestamp: new Date().toISOString(),
-      statutory_basis: "PA Act 102 & No Surprises Act",
+      statutory_basis: "PA Act 102 (§ 3, 5, 7) & No Surprises Act",
       regulatory_notice: PA_DOI_DISCLAIMER,
       benchmark_notice: BENCHMARK_DISCLAIMER,
       ethics_statement: "This analysis is produced by a non-legal assistant tool for patient education. Only redacted data is preserved in this package."
