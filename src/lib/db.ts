@@ -4,12 +4,16 @@ export interface OverchargeItem {
   description: string;
   billedAmount: number;
   benchmarkAmount: number;
+  medicareProxyAmount?: number;
   percentOver: number;
+  legalCitation?: string;
+  statutoryReference?: string;
 }
 export interface AuditFlag {
   type: string;
   severity: 'low' | 'medium' | 'high';
   description: string;
+  isSevere?: boolean;
   taxonomy?: {
     rule_id: string;
     statute_ref: string;
@@ -33,6 +37,8 @@ export interface AuditRecord {
   planType: 'COMMERCIAL' | 'MEDICAID' | 'MEDICARE' | 'UNKNOWN';
   zipCode?: string;
   fingerprint?: string;
+  fapEligible?: boolean;
+  legalAuditSummary?: string;
   extractedData: {
     providerName?: string;
     dateOfService?: string;
@@ -74,7 +80,7 @@ const DB_NAME = 'billguard-pa-db';
 const STORE_NAME = 'audits';
 const FILINGS_STORE = 'insurance_filings';
 const REDACTION_STORE = 'redaction_audits';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 let dbPromise: Promise<IDBPDatabase> | null = null;
 function getDB() {
   if (!dbPromise) {
