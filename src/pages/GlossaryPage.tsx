@@ -3,23 +3,30 @@ import { Search, Book } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GLOSSARY_TERMS } from '@/data/constants';
+import { useLanguage } from '@/hooks/use-language';
 export function GlossaryPage() {
   const [search, setSearch] = useState('');
-  const filteredTerms = GLOSSARY_TERMS.filter(item => 
-    item.term.toLowerCase().includes(search.toLowerCase()) || 
+  const { language } = useLanguage();
+  const terms = language === 'pl' ? GLOSSARY_TERMS.pl : GLOSSARY_TERMS.en;
+  const filteredTerms = terms.filter(item =>
+    item.term.toLowerCase().includes(search.toLowerCase()) ||
     item.definition.toLowerCase().includes(search.toLowerCase())
   );
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="flex flex-col space-y-4">
-        <h1 className="text-3xl font-bold tracking-tight">Billing Glossary</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {language === 'pl' ? 'Glosariusz Medyczny' : 'Billing Glossary'}
+        </h1>
         <p className="text-muted-foreground max-w-2xl">
-          Decoding the jargon used in medical bills. Understanding these terms is the first step in identifying errors and overcharges.
+          {language === 'pl' 
+            ? 'Zrozumienie terminologii stosowanej w rozliczeniach NFZ i prywatnych placówkach to pierwszy krok do wykrycia błędów.' 
+            : 'Decoding the jargon used in medical bills.'}
         </p>
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input 
-            placeholder="Search terms or definitions..." 
+          <Input
+            placeholder={language === 'pl' ? 'Szukaj pojęć...' : 'Search terms...'}
             className="pl-10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -45,7 +52,7 @@ export function GlossaryPage() {
           ))
         ) : (
           <div className="col-span-full py-12 text-center text-muted-foreground">
-            No terms found matching your search.
+            {language === 'pl' ? 'Nie znaleziono pasujących pojęć.' : 'No terms found.'}
           </div>
         )}
       </div>

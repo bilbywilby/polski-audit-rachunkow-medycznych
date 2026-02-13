@@ -25,26 +25,28 @@ export async function extractTextFromPdf(file: File): Promise<string> {
 function redactSensitiveData(text: string): string {
   let redacted = text;
   Object.values(REDACTION_PATTERNS).forEach(pattern => {
-    redacted = redacted.replace(pattern, '[REDACTED]');
+    redacted = redacted.replace(pattern, '[ZAMASKOWANO]');
   });
   return redacted;
 }
 function extractSmartData(text: string) {
   const dateMatches = text.match(CODE_PATTERNS.date) || [];
+  const dateAltMatches = text.match(CODE_PATTERNS.dateAlt) || [];
+  const allDateMatches = [...dateMatches, ...dateAltMatches];
   const policyMatch = text.match(CODE_PATTERNS.policy);
   const accountMatch = text.match(CODE_PATTERNS.account);
-  const sortedDates = [...new Set(dateMatches)].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+  const sortedDates = [...new Set(allDateMatches)].sort((a, b) => new Date(a.split('.').reverse().join('-')).getTime() - new Date(b.split('.').reverse().join('-')).getTime());
   let providerName = '';
-  const providerKeywords = ['Hospital', 'Clinic', 'Medical Center', 'Health', 'Specialists', 'Physicians', 'Surgery Center'];
+  const providerKeywords = ['Szpital', 'Przychodnia', 'Centrum Medyczne', 'Klinika', 'Hospital', 'Clinic', 'Specialists'];
   const lines = text.split('\n');
-  for (const line of lines.slice(0, 20)) {
+  for (const line of lines.slice(0, 25)) {
     if (providerKeywords.some(kw => line.toLowerCase().includes(kw.toLowerCase()))) {
       providerName = line.trim();
       break;
     }
   }
   return {
-    providerName: providerName || 'Not Detected',
+    providerName: providerName || 'Nie wykryto',
     serviceDate: sortedDates[0] || '',
     billDate: sortedDates[sortedDates.length - 1] || '',
     policyId: policyMatch ? policyMatch[1] : '',
@@ -57,25 +59,21 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
   const smartData = extractSmartData(text);
   const cptMatches = Array.from(new Set(text.match(CODE_PATTERNS.cpt) || []));
   const icdMatches = Array.from(new Set(text.match(CODE_PATTERNS.icd10) || []));
-  const hcpcsMatches = Array.from(new Set(text.match(CODE_PATTERNS.hcpcs) || []));
-  const revenueMatches = Array.from(new Set(text.match(CODE_PATTERNS.revenue) || []));
-  const npiMatches = Array.from(new Set(text.match(CODE_PATTERNS.npi) || []));
+  const peselMatches = Array.from(new Set(text.match(CODE_PATTERNS.pesel) || []));
   const amountsMatches = text.match(CODE_PATTERNS.amounts) || [];
-  const amounts = amountsMatches.map(m => parseFloat(m.replace(/[$,\s]/g, ''))).filter(n => !isNaN(n));
+  const amounts = amountsMatches.map(m => parseFloat(m.replace(/[PLNzł$,\s]/g, '').replace(',', '.'))).filter(n => !isNaN(n));
   const totalAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
   const overcharges: OverchargeItem[] = [];
   cptMatches.forEach(code => {
     const benchmark = PA_COST_BENCHMARKS.find(b => b.code === code);
-    if (benchmark) {
-      if (totalAmount > benchmark.avgCost * 1.15) {
-        overcharges.push({
-          code,
-          description: benchmark.description,
-          billedAmount: totalAmount,
-          benchmarkAmount: benchmark.avgCost,
-          percentOver: Math.round(((totalAmount - benchmark.avgCost) / benchmark.avgCost) * 100)
-        });
-      }
+    if (benchmark && totalAmount > benchmark.avgCost * 1.2) {
+      overcharges.push({
+        code,
+        description: benchmark.description,
+        billedAmount: totalAmount,
+        benchmarkAmount: benchmark.avgCost,
+        percentOver: Math.round(((totalAmount - benchmark.avgCost) / benchmark.avgCost) * 100)
+      });
     }
   });
   const ruleCtx = { rawText: text, codes: cptMatches, overcharges };
@@ -95,9 +93,7 @@ export async function analyzeBillText(text: string, fileName: string): Promise<A
     totalAmount,
     detectedCpt: cptMatches,
     detectedIcd: icdMatches,
-    detectedHcpcs: hcpcsMatches,
-    detectedRevenue: revenueMatches,
-    detectedNpi: npiMatches,
+    detectedNpi: peselMatches, // Repurposing NPI field for PESEL detection matches in this locale
     extractedData: {
       providerName: smartData.providerName,
       dateOfService: smartData.serviceDate,
