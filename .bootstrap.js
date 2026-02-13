@@ -81,7 +81,8 @@ function runSetupCommands() {
     "bun add react-dropzone@^14.2.3",
     "bun add pdfjs-dist@^4.7.432",
     "bun add idb@^8.0.0",
-    "bun add recharts@2.15.4"
+    "bun add recharts@2.15.4",
+    "bun add uuid@^11.1.0"
 ];
     
     if (commands.length === 0) {
