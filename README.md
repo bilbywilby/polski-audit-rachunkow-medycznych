@@ -1,6 +1,6 @@
 # BillGuard
 
-[![Deploy to Cloudflare]([cloudflarebutton])](https://deploy.workers.cloudflare.com/)
+[![Deploy to Cloudflare]([![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bilbywilby/polski-audit-rachunkow-medycznych))](https://deploy.workers.cloudflare.com/)
 
 A modern full-stack web application built on Cloudflare Workers and Pages. Features a responsive React frontend with Tailwind CSS and shadcn/ui components, powered by a Hono-based API backend running on Workers. Includes state management, theming, error reporting, and seamless deployment to Cloudflare's global edge network.
 
@@ -88,7 +88,7 @@ This builds the frontend assets and deploys the Worker. Your app will be live at
 
 For custom domains or advanced config, edit `wrangler.jsonc`.
 
-[![Deploy to Cloudflare]([cloudflarebutton])](https://deploy.workers.cloudflare.com/)
+[![Deploy to Cloudflare]([![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bilbywilby/polski-audit-rachunkow-medycznych))](https://deploy.workers.cloudflare.com/)
 
 **Post-Deploy**:
 - Assets served via Cloudflare Pages integration
